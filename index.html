@@ -177,6 +177,7 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
       <a href="#pair"><div class="panel"><h3>Two-stock mixer</h3><p>Slide the weight between any two stocks and see the risk change, with the lowest-risk mix marked.</p><span class="go">Mix two stocks →</span></div></a>
       <a href="#single"><div class="panel"><h3>One-stock deep dive</h3><p>Price chart, CAGR, daily and yearly risk, best and worst day, and the biggest fall from a peak.</p><span class="go">Study a stock →</span></div></a>
       <a href="#screen"><div class="panel"><h3>Nifty 500 screener</h3><p>Filter by sector and sort by return, risk or return per unit of risk. Add any stock to your portfolio in one tap.</p><span class="go">Screen stocks →</span></div></a>
+      <a href="#portfolio"><div class="panel"><h3>Optimiser and efficient frontier</h3><p>Find the lowest-risk and best-Sharpe weights for your stocks, see the efficient frontier, and apply the weights in one tap. Download everything for Excel.</p><span class="go">Optimise my portfolio →</span></div></a>
       <a href="#learn"><div class="panel"><h3>Formulas explained</h3><p>Variance, standard deviation, covariance, correlation and portfolio risk in plain words, the same way you would do them in Excel.</p><span class="go">Learn the maths →</span></div></a>
     </div>
   </section>
@@ -203,17 +204,19 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
   <div class="ctl">
     <input id="sq" type="search" placeholder="Search name or symbol" aria-label="Search">
     <select id="ssec" aria-label="Sector"></select>
+    <label style="display:flex;align-items:center;gap:6px;font-size:14px;flex:0 1 auto">Risk-free %<input id="srf" inputmode="decimal" style="width:80px"></label>
     <select id="ssort" aria-label="Sort">
-      <option value="rr">Best return per unit of risk</option>
+      <option value="rr">Best Sharpe ratio</option>
       <option value="ar">Highest yearly return</option>
       <option value="lowk">Lowest risk</option>
       <option value="cagr">Highest CAGR</option>
+      <option value="lowb">Lowest beta</option>
       <option value="chg">Today's change</option>
     </select>
   </div>
   <p class="note" id="scount" style="margin:0 0 8px"></p>
   <div class="scroll"><table id="stab"></table></div>
-  <p class="note">Return and risk are yearly figures for the chosen period (1Y, 3Y, 5Y or 10Y). Return per risk = yearly return ÷ yearly risk; higher is better. Stocks without enough history for the period are hidden.</p>
+  <p class="note">Return and risk are yearly figures for the chosen period (1Y, 3Y, 5Y or 10Y). Sharpe = (yearly return − risk-free rate) ÷ yearly risk; higher is better. Beta: how much the stock moves when Nifty 50 moves 1%. Stocks without enough history for the period are hidden.</p>
 </template>
 
 <template id="t-portfolio">
@@ -268,6 +271,9 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
     <div class="panel"><h3>Two-stock risk</h3><p>σp² = wA²σA² + wB²σB² + 2·wA·wB·ρ·σA·σB. Lowest-risk weight in A = (σB² − Cov) ÷ (σA² + σB² − 2·Cov).</p></div>
     <div class="panel"><h3>Many stocks</h3><p>Return = Σ wᵢ·Rᵢ. Variance = Σᵢ Σⱼ wᵢ·wⱼ·Covᵢⱼ: every pair of stocks adds a covariance term. Risk = √variance.</p></div>
     <div class="panel"><h3>Share of risk</h3><p>Share from stock i = wᵢ × Σⱼ wⱼ·Covᵢⱼ ÷ portfolio variance. Shares add up to 100%; a stock can add more risk than its weight.</p></div>
+    <div class="panel"><h3>Sharpe ratio</h3><p>Sharpe = (annual return − risk-free rate) ÷ annual risk. It is the extra return for each unit of risk; higher is better. Set the risk-free rate (for example the T-bill or G-sec yield) on the Portfolio page.</p></div>
+    <div class="panel"><h3>Beta vs Nifty 50</h3><p>Beta = Cov(stock, Nifty 50) ÷ Var(Nifty 50), from daily returns on the same days. Beta 1.2 means the stock moved about 1.2% when Nifty moved 1%. Portfolio beta = Σ weight × beta.</p></div>
+    <div class="panel"><h3>Efficient frontier and optimiser</h3><p>For each target return, the lowest-risk mix of your stocks (weights 0% or more, adding to 100%, up to your limit per stock). The lowest-risk mix is the left tip; the best-Sharpe mix is where a line from the risk-free rate just touches the curve.</p></div>
     <div class="panel"><h3>Weights</h3><p>By quantity: weight = quantity × latest price ÷ total value. By weight %: the numbers you type, scaled to add up to 100%.</p></div>
   </div>
   <p class="note" id="srcnote"></p>
@@ -290,7 +296,8 @@ const fmtD=s=>new Date(s+"T00:00:00Z").toLocaleDateString("en-GB",{day:"2-digit"
 
 let STOCKS={},LIST=[],meta=null,sample=false,saveT=null,token=0;
 const store={};
-const state={period:1,mode:"qty",holdings:[{sym:"TCS",qty:10,buy:3100,wt:30},{sym:"INFY",qty:20,buy:1500,wt:30},{sym:"HDFCBANK",qty:40,buy:950,wt:40}],pairA:"TCS",pairB:"HDFCBANK",pairW:50,single:"TCS"};
+const state={period:1,mode:"qty",holdings:[{sym:"TCS",qty:10,buy:3100,wt:30},{sym:"INFY",qty:20,buy:1500,wt:30},{sym:"HDFCBANK",qty:40,buy:950,wt:40}],pairA:"TCS",pairB:"HDFCBANK",pairW:50,single:"TCS",rf:0.065,cap:0.4};
+const IDX="^NIFTY",hasIdx=()=>!!STOCKS[IDX];
 const nm=s=>STOCKS[s]?STOCKS[s].name:s;
 
 /* ---------- data ---------- */
@@ -306,6 +313,7 @@ async function boot(){
       return {sym:s,name:SAMPLE.names[s],ind:SAMPLE.inds[s],last:p.at(-1),date:SAMPLE.dates.at(-1),chg:p.at(-1)/p.at(-2)-1,m:{1:[S.ar,S.ak,S.pr,S.cagr]}}});
   }
   STOCKS=Object.fromEntries(LIST.map(x=>[x.sym,x]));
+  if(meta&&meta.nifty)STOCKS[IDX]={sym:IDX,name:"Nifty 50",file:"_NIFTY50",ind:"Index",last:meta.nifty.last,date:meta.nifty.date,m:meta.nifty.m};
   status();route();
 }
 const inflight={};
@@ -353,18 +361,24 @@ function axes(W,H,m,x0,x1,y0,y1,fx,fy){
 }
 const pad=(a,b,f=.12)=>{const d=(b-a)||Math.abs(a)||.01;return [a-d*f,b+d*f]};
 function draw(el,fn){const s=el.querySelector("svg");const go=()=>{if(s.clientWidth)s.innerHTML=fn(s.clientWidth,s.clientHeight)};go();const ro=new ResizeObserver(go);ro.observe(s)}
-function scatter(W,H,pts,curve){
+function scatter(W,H,pts,curve,line){
   const m={l:56,r:24,t:18,b:42},all=[...pts,...(curve||[])];
   let [x0,x1]=pad(Math.min(...all.map(p=>p.x)),Math.max(...all.map(p=>p.x)));x0=Math.max(0,x0);
   let [y0,y1]=pad(Math.min(0,...all.map(p=>p.y)),Math.max(0,...all.map(p=>p.y)));
   const a=axes(W,H,m,x0,x1,y0,y1,t=>pct(t,0),t=>pct(t,0));let g=a.g;
   g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${a.Y(0)}" y2="${a.Y(0)}" stroke="var(--mute)"/>`;
   g+=`<text x="${W-m.r}" y="${H-6}" text-anchor="end">Risk (annual SD) →</text><text x="${m.l}" y="12">↑ Annual return</text>`;
+  if(line)g+=`<line x1="${a.X(Math.max(x0,line[0].x))}" y1="${a.Y(line[0].y+(line[1].y-line[0].y)*(Math.max(x0,line[0].x)-line[0].x)/(line[1].x-line[0].x))}" x2="${a.X(Math.min(x1,line[1].x))}" y2="${a.Y(line[0].y+(line[1].y-line[0].y)*(Math.min(x1,line[1].x)-line[0].x)/(line[1].x-line[0].x))}" stroke="var(--ink)" stroke-dasharray="5 5" stroke-opacity=".6"/>`;
   if(curve)g+=`<polyline fill="none" stroke="var(--teal)" stroke-width="2.5" stroke-opacity=".45" points="${curve.map(p=>a.X(p.x)+","+a.Y(p.y)).join(" ")}"/>`;
-  for(const p of pts){const X=a.X(p.x),Y=a.Y(p.y),left=X>W*.7;
+  const placed=[],free=(x0b,y0b,wb)=>!placed.some(b=>x0b<b[0]+b[2]&&b[0]<x0b+wb&&Math.abs(y0b-b[1])<15);
+  const order=pts.map((p,i)=>i).sort((i,j)=>(pts[j].main?2:pts[j].label?1:0)-(pts[i].main?2:pts[i].label?1:0));
+  const lab={};
+  for(const i of order){const p=pts[i];if(!p.label)continue;const X=a.X(p.x),Y=a.Y(p.y),left=X>W*.7,wb=p.label.length*7.6+4;
+    for(const dy of [0,16,-16,30,-30]){const lx=left?X-14-wb:X+14;if(free(lx,Y+dy,wb)){placed.push([lx,Y+dy,wb]);lab[i]=[left?X-14:X+14,Y+dy+4,left];break}}}
+  pts.forEach((p,i)=>{const X=a.X(p.x),Y=a.Y(p.y);
     g+=p.main?`<circle class="ring" cx="${X}" cy="${Y}" r="11" fill="var(--teal)" fill-opacity=".18" stroke="var(--teal)" stroke-width="3"/>`
       :`<circle cx="${X}" cy="${Y}" r="${p.small?4:6}" fill="${p.min?"var(--bg)":"var(--ink)"}" stroke="var(--ink)" stroke-width="${p.min?2:0}"/>`;
-    if(p.label)g+=`<text class="lbl" x="${left?X-14:X+14}" y="${Y+4}" text-anchor="${left?"end":"start"}">${esc(p.label)}</text>`}
+    if(lab[i])g+=`<text class="lbl" x="${lab[i][0]}" y="${lab[i][1]}" text-anchor="${lab[i][2]?"end":"start"}">${esc(p.label)}</text>`});
   return g;
 }
 function lineChart(W,H,dates,p){
@@ -441,26 +455,35 @@ function renderPortfolio(){
   $("#hold").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{H.splice(+b.dataset.del,1);save();renderPortfolio()});
   const syms=H.map(h=>h.sym).filter(s=>STOCKS[s]);
   if(!syms.length){$("#pres").innerHTML=banner()+`<p class="load">Add stocks to see your portfolio's risk and return.</p>`;$("#pdetail").innerHTML="";return}
-  needs(syms,$("#pres"),(ok,bad)=>{
-    if(!ok.length){$("#pres").innerHTML=errs(bad);$("#pdetail").innerHTML="";return}
-    const use=H.filter(h=>ok.includes(h.sym)),A=align(use.map(h=>h.sym),state.period);
+  needs(hasIdx()?syms.concat(IDX):syms,$("#pres"),(ok,bad0)=>{
+    const bad=bad0.filter(b=>!b.startsWith(IDX)),withIdx=ok.includes(IDX);
+    const use=H.filter(h=>ok.includes(h.sym)),k=use.length;
+    if(!k){$("#pres").innerHTML=errs(bad);$("#pdetail").innerHTML="";return}
+    const AA=align(withIdx?[...use.map(h=>h.sym),IDX]:use.map(h=>h.sym),state.period);
+    const A={...AA,px:AA.px.slice(0,k),ret:AA.ret.slice(0,k)},mret=withIdx?AA.ret[k]:null,mS=withIdx?stats(AA.px[k],mret,AA.dates):null;
     if(A.dates.length<21){$("#pres").innerHTML=errs(bad)+`<p class="err">Not enough shared trading days for these stocks.</p>`;$("#pdetail").innerHTML="";return}
     const lp=A.px.map(p=>p.at(-1)),v=use.map((h,i)=>q?h.qty*lp[i]:Math.max(0,+h.wt||0)),t=v.reduce((a,b)=>a+b,0);
     if(!(t>0)){$("#pres").innerHTML=`<p class="load">Enter a quantity or weight above zero.</p>`;$("#pdetail").innerHTML="";return}
-    const w=v.map(x=>x/t),P=portfolio(A,w);
+    const w=v.map(x=>x/t),P=portfolio(A,w),rf=state.rf;
+    const beta=A.ret.map(r=>mret?cov(r,mret)/cov(mret,mret):NaN),pb=w.reduce((s,x,i)=>s+x*beta[i],0),psh=(P.ret-rf)/P.risk;
     const inv=q?use.reduce((s,h)=>s+(h.buy>0?h.qty*h.buy:0),0):0,cur=q?use.reduce((s,h,i)=>s+(h.buy>0?h.qty*lp[i]:0),0):0;
     $("#pres").innerHTML=banner()+errs(bad)+`<div class="figs">
       <div class="fig1"><div class="lab">Portfolio risk a year</div><div class="big">${pct(P.risk,1)}</div></div>
       <div class="fig1"><div class="lab">Portfolio return a year</div><div class="big ${cls(P.ret)}">${pct(P.ret,1)}</div></div>
+      <div class="fig1"><div class="lab">Sharpe ratio</div><div class="mid ${cls(psh)}">${psh.toFixed(2)}</div><div class="lab">risk-free ${pct(rf,1)}</div></div>
+      <div class="fig1"><div class="lab">Beta vs Nifty 50</div><div class="mid">${Number.isFinite(pb)?pb.toFixed(2):"–"}</div><div class="lab">${Number.isFinite(pb)?(pb>1.1?"moves more than the market":pb<.9?"moves less than the market":"moves like the market"):"Nifty data not loaded"}</div></div>
       <div class="fig1"><div class="lab">Risk cut by mixing</div><div class="mid">${pct(P.wavg-P.risk,1)}</div><div class="lab">from ${pct(P.wavg,1)}</div></div>
       ${inv>0?`<div class="fig1"><div class="lab">Gain on your cost</div><div class="mid ${cls(cur-inv)}">${rs(cur-inv)}</div><div class="lab">${pct(cur/inv-1,1)} on ₹${num(inv,0)}</div></div>`:""}
-    </div><div class="panel"><div class="fig" id="pfig"><svg role="img" aria-label="Risk versus return of each stock and the portfolio"></svg></div>
-    <p class="note">Each dot is a stock; the ring is your portfolio. Higher is more return, further right is more risk. ${A.dates.length-1} daily returns, ${fmtD(A.dates[0])} to ${fmtD(A.dates.at(-1))}.</p></div>`+shortNote(A);
-    draw($("#pfig"),(W,Hh)=>scatter(W,Hh,[...P.S.map((s,i)=>({x:s.ak,y:s.ar,label:use[i].sym})),{x:P.risk,y:P.ret,label:"Portfolio",main:1}]));
-    const k=use.length,heat=c=>`background:color-mix(in srgb,${c<0?"var(--red)":"var(--teal)"} ${Math.round(Math.abs(c)*70)}%,var(--bg))`;
-    $("#pdetail").innerHTML=healthHTML(use,w,P)+`<section><h2>Each stock</h2><div class="scroll"><table><thead><tr><th>Stock</th><th>Weight</th><th>Return</th><th>Risk</th><th>Risk share</th><th class="hide-s">Price return</th><th class="hide-s">CAGR</th></tr></thead><tbody>${
-      P.S.map((s,i)=>`<tr><td><b>${esc(use[i].sym)}</b></td><td class="n">${pct(w[i],1)}</td><td class="n ${cls(s.ar)}">${pct(s.ar,1)}</td><td class="n">${pct(s.ak,1)}</td><td class="n">${pct(P.contrib[i],1)}</td><td class="n hide-s ${cls(s.pr)}">${pct(s.pr,1)}</td><td class="n hide-s ${cls(s.cagr)}">${pct(s.cagr,1)}</td></tr>`).join("")}</tbody></table></div>
-      <p class="note">Share of risk: how much of the portfolio's risk comes from each stock. Far above its weight means it adds more risk than its size suggests.</p></section>
+    </div><div class="panel"><div class="fig" id="pfig"><svg role="img" aria-label="Risk versus return of each stock, the portfolio and Nifty 50"></svg></div>
+    <p class="note">Each dot is a stock; the ring is your portfolio${mS?"; the hollow dot is Nifty 50":""}. Higher is more return, further right is more risk. ${A.dates.length-1} daily returns, ${fmtD(A.dates[0])} to ${fmtD(A.dates.at(-1))}.</p></div>`+shortNote(A);
+    draw($("#pfig"),(W,Hh)=>scatter(W,Hh,[...P.S.map((s,i)=>({x:s.ak,y:s.ar,label:use[i].sym})),...(mS?[{x:mS.ak,y:mS.ar,label:"NIFTY 50",min:1}]:[]),{x:P.risk,y:P.ret,label:"Portfolio",main:1}]));
+    const heat=c=>`background:color-mix(in srgb,${c<0?"var(--red)":"var(--teal)"} ${Math.round(Math.abs(c)*70)}%,var(--bg))`;
+    const opt=k>1?optimise(A,P,use,w,beta):null;
+    lastExport={A,P,use,w,beta,pb,psh,mS,opt};
+    $("#pdetail").innerHTML=healthHTML(use,w,P)+(opt?opt.html:"")+`<section><h2>Each stock</h2><div class="scroll"><table><thead><tr><th>Stock</th><th>Weight</th><th>Return</th><th>Risk</th><th>Sharpe</th><th class="hide-s">Beta</th><th>Risk share</th><th class="hide-s">Price return</th><th class="hide-s">CAGR</th></tr></thead><tbody>${
+      P.S.map((s,i)=>`<tr><td><b>${esc(use[i].sym)}</b></td><td class="n">${pct(w[i],1)}</td><td class="n ${cls(s.ar)}">${pct(s.ar,1)}</td><td class="n">${pct(s.ak,1)}</td><td class="n">${((s.ar-rf)/s.ak).toFixed(2)}</td><td class="n hide-s">${Number.isFinite(beta[i])?beta[i].toFixed(2):"–"}</td><td class="n">${pct(P.contrib[i],1)}</td><td class="n hide-s ${cls(s.pr)}">${pct(s.pr,1)}</td><td class="n hide-s ${cls(s.cagr)}">${pct(s.cagr,1)}</td></tr>`).join("")}
+      ${mS?`<tr><td><i>Nifty 50</i></td><td></td><td class="n ${cls(mS.ar)}">${pct(mS.ar,1)}</td><td class="n">${pct(mS.ak,1)}</td><td class="n">${((mS.ar-rf)/mS.ak).toFixed(2)}</td><td class="n hide-s">1.00</td><td></td><td class="n hide-s ${cls(mS.pr)}">${pct(mS.pr,1)}</td><td class="n hide-s ${cls(mS.cagr)}">${pct(mS.cagr,1)}</td></tr>`:""}</tbody></table></div>
+      <p class="note">Sharpe = (return − risk-free rate) ÷ risk; higher is better. Beta above 1 moves more than Nifty 50, below 1 moves less. Risk share: how much of the portfolio's risk comes from each stock.</p></section>
       ${k>1?`<section><h2>Correlation</h2><div class="scroll"><table style="width:auto"><thead><tr><th></th>${use.map(h=>`<th>${esc(h.sym)}</th>`).join("")}</tr></thead><tbody>${
         P.corr.map((r,i)=>`<tr><td><b>${esc(use[i].sym)}</b></td>${r.map((c,j)=>`<td class="n" style="${i===j?"":heat(c)}">${c.toFixed(2)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
         <p class="note">Near +1: they move together. Near 0 or below: they offset each other and lower risk.</p></section>`:""}
@@ -471,8 +494,84 @@ function renderPortfolio(){
         <tr><td>Portfolio variance</td><td class="n">${P.v.toFixed(4)}</td></tr>
         <tr><td><b>Portfolio risk = √variance</b></td><td class="n"><b>${pct(P.risk,2)}</b></td></tr>
         <tr><td>Weighted average of stock risks (if every ρ were 1)</td><td class="n">${pct(P.wavg,2)}</td></tr>
-      </tbody></table></div></details>`;
+        <tr><td>Sharpe = (${pct(P.ret,2)} − ${pct(rf,2)}) ÷ ${pct(P.risk,2)}</td><td class="n">${psh.toFixed(3)}</td></tr>
+        <tr><td>Beta = Σ weight × stock beta</td><td class="n">${Number.isFinite(pb)?pb.toFixed(3):"–"}</td></tr>
+      </tbody></table></div></details>
+      <p style="margin-top:18px"><button class="btn ghost" id="csvBtn" type="button">Download results for Excel (CSV)</button></p>`;
+    if(opt)opt.after();
+    $("#csvBtn").onclick=downloadCSV;
   });
+}
+
+/* ---------- optimiser ---------- */
+const dot=(a,b)=>a.reduce((s,x,i)=>s+x*b[i],0);
+const quad=(w,S)=>w.reduce((s,wi,i)=>s+wi*dot(S[i],w),0);
+function projCap(v,cap){
+  const n=v.length;cap=Math.max(cap,1/n+1e-9);
+  let lo=Math.min(...v)-cap-1,hi=Math.max(...v)+1;
+  for(let it=0;it<80;it++){const m=(lo+hi)/2,s=v.reduce((a,x)=>a+Math.min(cap,Math.max(0,x-m)),0);if(s>1)lo=m;else hi=m}
+  const m=(lo+hi)/2;return v.map(x=>Math.min(cap,Math.max(0,x-m)));
+}
+function mvOpt(mu,S,lam,cap,w0){
+  const n=mu.length;let L=0;for(const r of S)L=Math.max(L,r.reduce((a,x)=>a+Math.abs(x),0));
+  const eta=1/(2*(L||1));let w=projCap(w0?w0.slice():Array(n).fill(1/n),cap);
+  for(let it=0;it<1200;it++){const g=S.map((r,i)=>2*dot(r,w)-lam*mu[i]);w=projCap(w.map((x,i)=>x-eta*g[i]),cap)}
+  return w;
+}
+function frontier(mu,S,cap){
+  const pts=[];let w=null;
+  for(const lam of [0,...Array.from({length:36},(_,k)=>.004*Math.pow(1.28,k))]){w=mvOpt(mu,S,lam,cap,w);pts.push({w:w.slice(),r:dot(w,mu),k:Math.sqrt(quad(w,S))})}
+  return pts;
+}
+function optimise(A,P,use,w,beta){
+  const mu=P.S.map(s=>s.ar),S=P.C.map(r=>r.map(c=>c*TD)),cap=state.cap,rf=state.rf,n=use.length;
+  const F=frontier(mu,S,cap),minV=F[0],sh=p=>(p.r-rf)/p.k,best=F.reduce((a,p)=>sh(p)>sh(a)?p:a,F[0]);
+  const pb=x=>x.reduce((s,v,i)=>s+v*beta[i],0),cur={w,r:P.ret,k:P.risk};
+  const cols=[["Your mix",cur],["Lowest risk",minV],["Best Sharpe",best]];
+  const capOpts=[1,.5,.4,.3,.2].filter(c=>c>=1/n-1e-9);
+  const html=`<section style="margin-top:28px"><h2>Optimiser and efficient frontier</h2>
+    <div class="ctl"><label style="font-size:14px;display:grid;gap:2px">Risk-free rate % a year<input id="rfIn" inputmode="decimal" value="${(rf*100).toFixed(2)}"></label>
+    <label style="font-size:14px;display:grid;gap:2px">Most in one stock<select id="capIn">${capOpts.map(c=>`<option value="${c}" ${Math.abs(c-cap)<1e-9?"selected":""}>${c===1?"No limit":pct(c,0)}</option>`).join("")}</select></label></div>
+    <div class="grid2"><div class="panel"><div class="fig" id="ffig"><svg role="img" aria-label="Efficient frontier"></svg></div>
+      <p class="note">The curve is the efficient frontier: for each level of risk, the highest return these stocks could have given (no short selling${cap<1?", at most "+pct(cap,0)+" in one stock":""}). The dashed line from the risk-free rate touches the curve at the best-Sharpe mix.</p></div>
+    <div><div class="scroll"><table><thead><tr><th>Weights</th>${cols.map(c=>`<th>${c[0]}</th>`).join("")}</tr></thead><tbody>
+      ${use.map((h,i)=>`<tr><td><b>${esc(h.sym)}</b></td>${cols.map(c=>`<td class="n">${pct(c[1].w[i],1)}</td>`).join("")}</tr>`).join("")}
+      <tr><td>Return a year</td>${cols.map(c=>`<td class="n ${cls(c[1].r)}"><b>${pct(c[1].r,1)}</b></td>`).join("")}</tr>
+      <tr><td>Risk a year</td>${cols.map(c=>`<td class="n"><b>${pct(c[1].k,1)}</b></td>`).join("")}</tr>
+      <tr><td>Sharpe ratio</td>${cols.map(c=>`<td class="n">${sh(c[1]).toFixed(2)}</td>`).join("")}</tr>
+      <tr><td>Beta</td>${cols.map(c=>`<td class="n">${Number.isFinite(pb(c[1].w))?pb(c[1].w).toFixed(2):"–"}</td>`).join("")}</tr>
+    </tbody></table></div>
+    <div class="row" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px"><button class="btn ghost" id="useMin" type="button">Use lowest-risk weights</button><button class="btn ghost" id="useBest" type="button">Use best-Sharpe weights</button></div>
+    ${sh(best)<0?`<p class="note"><b>Note:</b> in this period every mix returned less than the risk-free rate (${pct(rf,1)}), so all Sharpe ratios are negative and "Best Sharpe" is only the least bad mix. Try a longer period.</p>`:""}
+    <p class="note">Weights come from the chosen period's past returns and risk. They show what would have worked best, not a prediction; check them against other periods before using them.</p></div></div></section>`;
+  const after=()=>{
+    draw($("#ffig"),(W,H)=>{
+      const tip=best;return scatter(W,H,[...P.S.map((s,i)=>({x:s.ak,y:s.ar,label:use[i].sym,small:1})),{x:minV.k,y:minV.r,label:"Lowest risk",min:1},{x:best.k,y:best.r,label:"Best Sharpe"},{x:cur.k,y:cur.r,label:"Your mix",main:1}],
+        F.map(p=>({x:p.k,y:p.r})),[{x:0,y:rf},{x:tip.k*1.25,y:rf+(tip.r-rf)*1.25}]);
+    });
+    $("#rfIn").onchange=()=>{const v=parseFloat($("#rfIn").value);if(Number.isFinite(v)&&v>=0&&v<30){state.rf=v/100;save();renderPortfolio()}};
+    $("#capIn").onchange=()=>{state.cap=+$("#capIn").value;save();renderPortfolio()};
+    const apply=x=>{state.mode="wt";use.forEach((h,i)=>{h.wt=Math.round(x.w[i]*1000)/10});save();document.getElementsByName("mode").forEach(r=>r.checked=r.value==="wt");renderPortfolio();toast("Weights applied. Switch back to 'By quantity' any time.")};
+    $("#useMin").onclick=()=>apply(minV);$("#useBest").onclick=()=>apply(best);
+  };
+  return {html,after,minV,best};
+}
+let lastExport=null;
+function downloadCSV(){
+  const X=lastExport;if(!X)return;
+  const q=v=>{const s=String(v??"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s},f=(x,d=4)=>Number.isFinite(x)?x.toFixed(d):"";
+  const L=[["Portfolio Risk Lab"],["Period",`${state.period} year(s)`,X.A.dates[0],X.A.dates.at(-1)],["Daily returns used",X.A.dates.length-1],["Risk-free rate",f(state.rf)],[],
+    ["Stock","Name","Sector","Weight","Annual return","Annual risk","Sharpe","Beta","Risk share","Price return","CAGR","Daily variance"]];
+  X.use.forEach((h,i)=>{const s=X.P.S[i];L.push([h.sym,nm(h.sym),sectorOf(h.sym),f(X.w[i]),f(s.ar),f(s.ak),f((s.ar-state.rf)/s.ak),f(X.beta[i]),f(X.P.contrib[i]),f(s.pr),f(s.cagr),f(s.v,8)])});
+  L.push([],["Portfolio","","",f(1),f(X.P.ret),f(X.P.risk),f(X.psh),f(X.pb)],["Portfolio variance",f(X.P.v,6)],["Weighted average risk",f(X.P.wavg)]);
+  if(X.mS)L.push(["Nifty 50","","","",f(X.mS.ar),f(X.mS.ak),f((X.mS.ar-state.rf)/X.mS.ak),"1"]);
+  L.push([],["Correlation",...X.use.map(h=>h.sym)],...X.use.map((h,i)=>[h.sym,...X.P.corr[i].map(c=>f(c,3))]));
+  L.push([],["Daily covariance",...X.use.map(h=>h.sym)],...X.use.map((h,i)=>[h.sym,...X.P.C[i].map(c=>f(c,8))]));
+  if(X.opt)L.push([],["Optimiser weights","Your mix","Lowest risk","Best Sharpe"],...X.use.map((h,i)=>[h.sym,f(X.w[i]),f(X.opt.minV.w[i]),f(X.opt.best.w[i])]),
+    ["Return",f(X.P.ret),f(X.opt.minV.r),f(X.opt.best.r)],["Risk",f(X.P.risk),f(X.opt.minV.k),f(X.opt.best.k)]);
+  const blob=new Blob(["﻿"+L.map(r=>r.map(q).join(",")).join("\n")],{type:"text/csv"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`portfolio-risk-${state.period}y-${X.A.dates.at(-1)}.csv`;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast("CSV downloaded. Open it in Excel.");
 }
 
 function viewPair(){
@@ -509,6 +608,7 @@ function renderPair(fast){
       <tr><td>Term 3: 2·wA·wB·ρ·σA·σB</td><td class="n" colspan="2">${(2*wa*(1-wa)*rho*SA.ak*SB.ak).toFixed(4)}</td></tr>
       <tr><td><b>Risk = √(sum)</b></td><td class="n" colspan="2"><b>${pct(P.risk)}</b></td></tr>
       <tr><td>Risk cut by mixing</td><td class="n" colspan="2">${pct(P.wavg-P.risk)}</td></tr>
+      <tr><td>Sharpe of the mix (risk-free ${pct(state.rf,1)})</td><td class="n" colspan="2">${((P.ret-state.rf)/P.risk).toFixed(2)}</td></tr>
     </tbody></table></div></details>`;
   };
   if(fast&&pairCache&&pairCache.key===a+b+state.period&&store[a]&&store[b]){token++;go([a,b],[]);return}
@@ -521,9 +621,11 @@ function viewSingle(){
 }
 function renderSingle(){
   const s=state.single;
-  needs([s],$("#sres"),(ok,bad)=>{
-    if(!ok.length){$("#sres").innerHTML=errs(bad);$("#sstats").innerHTML="";return}
-    const A=align([s],state.period),S=stats(A.px[0],A.ret[0],A.dates);
+  needs(hasIdx()?[s,IDX]:[s],$("#sres"),(ok,bad0)=>{
+    const bad=bad0.filter(b=>!b.startsWith(IDX));
+    if(!ok.includes(s)){$("#sres").innerHTML=errs(bad);$("#sstats").innerHTML="";return}
+    const wi=ok.includes(IDX),AA=align(wi?[s,IDX]:[s],state.period),A={...AA,px:[AA.px[0]],ret:[AA.ret[0]]},S=stats(A.px[0],A.ret[0],A.dates);
+    const mS=wi?stats(AA.px[1],AA.ret[1],AA.dates):null,beta=wi?cov(AA.ret[0],AA.ret[1])/cov(AA.ret[1],AA.ret[1]):NaN,corrM=wi?cov(AA.ret[0],AA.ret[1])/Math.sqrt(cov(AA.ret[0],AA.ret[0])*cov(AA.ret[1],AA.ret[1])):NaN;
     $("#sres").innerHTML=banner()+`<div class="figs">
       <div class="fig1"><div class="lab">Risk a year (SD)</div><div class="big">${pct(S.ak,1)}</div></div>
       <div class="fig1"><div class="lab">Price return</div><div class="big ${cls(S.pr)}">${pct(S.pr,1)}</div></div>
@@ -544,6 +646,10 @@ function renderSingle(){
       <tr><td>Worst day</td><td class="n neg">${pct(S.worst)}<br><span class="note">${fmtD(S.wd)}</span></td></tr>
       <tr><td>Days up / down</td><td class="n">${S.up} / ${S.down}</td></tr>
       <tr><td>Biggest fall from a peak</td><td class="n neg">${pct(S.mdd,1)}</td></tr>
+      <tr><td>Sharpe ratio (risk-free ${pct(state.rf,1)})</td><td class="n">${((S.ar-state.rf)/S.ak).toFixed(2)}</td></tr>
+      <tr><td>Beta vs Nifty 50</td><td class="n">${Number.isFinite(beta)?beta.toFixed(2):"–"}</td></tr>
+      <tr><td>Correlation with Nifty 50</td><td class="n">${Number.isFinite(corrM)?corrM.toFixed(2):"–"}</td></tr>
+      ${mS?`<tr><td>Nifty 50, same period: return / risk</td><td class="n"><span class="${cls(mS.ar)}">${pct(mS.ar,1)}</span> / ${pct(mS.ak,1)}</td></tr>`:""}
     </tbody></table>`;
   });
 }
@@ -574,7 +680,7 @@ function healthHTML(use,w,P){
       <p class="note">Share of your money in each sector${state.mode==="qty"?", at the latest prices":""}.</p></div>
   </div></section>`;
 }
-function metric(x,y){const m=x.m&&x.m[String(y)];return m?{ar:m[0],ak:m[1],pr:m[2],cagr:m[3],rr:m[1]>0?m[0]/m[1]:NaN}:null}
+function metric(x,y){const m=x.m&&x.m[String(y)];return m?{ar:m[0],ak:m[1],pr:m[2],cagr:m[3],beta:m[4]==null?NaN:m[4],rr:m[1]>0?(m[0]-state.rf)/m[1]:NaN}:null}
 function viewHome(){
   const ups=LIST.filter(x=>x.chg>0).length,downs=LIST.filter(x=>x.chg<0).length,last=LIST.map(x=>x.date).sort().at(-1);
   $("#hstrip").innerHTML=`<span><b>${LIST.length}</b>NSE stocks</span><span><b>${esc(fmtD(last))}</b>latest prices</span><span><b><span class="pos">${ups}</span> / <span class="neg">${downs}</span></b>up / down that day</span>`;
@@ -586,14 +692,16 @@ function viewHome(){
   const shown=pts.filter(p=>p.m.ak<=xmax&&p.m.ar>=ymin&&p.m.ar<=ymax);
   const best=shown.slice().sort((a,b)=>b.m.rr-a.m.rr)[0],big=shown.slice().sort((a,b)=>b.m.ar-a.m.ar)[0];
   const med=a=>{const s=a.slice().sort((p,r)=>p-r);return s[Math.floor(s.length/2)]};
-  $("#hnote").textContent=`Each dot is a stock. Middle stock: risk ${pct(med(xs),0)}, return ${pct(med(ys),0)} a year.${pts.length>shown.length?" A few extreme stocks are left off so the rest are readable.":""}`;
-  draw($("#hfig"),(W,H)=>scatter(W,H,shown.map(p=>({x:p.m.ak,y:p.m.ar,small:1,label:(p===best||p===big)?p.x.sym:""}))));
+  $("#hnote").textContent=`Each dot is a stock${STOCKS[IDX]?"; the ring is Nifty 50":""}. Middle stock: risk ${pct(med(xs),0)}, return ${pct(med(ys),0)} a year.${pts.length>shown.length?" A few extreme stocks are left off so the rest are readable.":""}`;
+  const nm0=STOCKS[IDX]?metric(STOCKS[IDX],y):null;
+  draw($("#hfig"),(W,H)=>scatter(W,H,[...shown.map(p=>({x:p.m.ak,y:p.m.ar,small:1,label:(p===best||p===big)?p.x.sym:""})),...(nm0?[{x:nm0.ak,y:nm0.ar,label:"NIFTY 50",main:1}]:[])]));
 }
 let scrSort="rr";
 function viewScreen(){
   const secs=[...new Set(LIST.map(x=>x.ind||"Other"))].sort();
   $("#ssec").innerHTML=`<option value="">All sectors</option>`+secs.map(s=>`<option>${esc(s)}</option>`).join("");
-  $("#ssort").value=scrSort;
+  $("#ssort").value=scrSort;$("#srf").value=(state.rf*100).toFixed(2);
+  $("#srf").onchange=()=>{const v=parseFloat($("#srf").value);if(Number.isFinite(v)&&v>=0&&v<30){state.rf=v/100;save();drawScreen()}};
   ["#sq","#ssec","#ssort"].forEach(id=>$(id).addEventListener("input",drawScreen));
   $("#stab").addEventListener("click",ev=>{const b=ev.target.closest("[data-add]");if(!b)return;const s=b.dataset.add;
     if(!state.holdings.some(h=>h.sym===s)){state.holdings.push({sym:s,qty:10,buy:0,wt:10});save()}b.disabled=true;b.textContent="Added";toast(s+" added to your portfolio")});
@@ -602,13 +710,13 @@ function viewScreen(){
 function drawScreen(){
   const q=$("#sq").value.trim().toLowerCase(),sec=$("#ssec").value,y=state.period;scrSort=$("#ssort").value;
   let rows=LIST.map(x=>({x,m:metric(x,y)})).filter(r=>r.m&&(!sec||(r.x.ind||"Other")===sec)&&(!q||r.x.sym.toLowerCase().includes(q)||r.x.name.toLowerCase().includes(q)));
-  const key={rr:r=>-r.m.rr,ar:r=>-r.m.ar,lowk:r=>r.m.ak,cagr:r=>-r.m.cagr,chg:r=>-(r.x.chg||0)}[scrSort];
+  const key={lowb:r=>Number.isFinite(r.m.beta)?r.m.beta:99,rr:r=>-r.m.rr,ar:r=>-r.m.ar,lowk:r=>r.m.ak,cagr:r=>-r.m.cagr,chg:r=>-(r.x.chg||0)}[scrSort];
   rows.sort((a,b)=>key(a)-key(b));
   const held=new Set(state.holdings.map(h=>h.sym));
   $("#scount").textContent=`${rows.length} stock${rows.length===1?"":"s"} · period ${y} year${y>1?"s":""}`;
-  $("#stab").innerHTML=`<thead><tr><th>Stock</th><th class="hide-s">Sector</th><th class="hide-s">Last ₹</th><th class="hide-s">Today</th><th>Return</th><th>Risk</th><th>Ret / risk</th><th></th></tr></thead><tbody>${
-    rows.slice(0,300).map(({x,m})=>`<tr><td><b>${esc(x.sym)}</b><br><span class="note" style="margin:0">${esc(x.name.length>20?x.name.slice(0,19)+"…":x.name)}</span></td><td class="hide-s">${esc(x.ind||"Other")}</td><td class="n hide-s">${num(x.last)}</td><td class="n hide-s ${cls(x.chg||0)}">${pct(x.chg,1)}</td><td class="n ${cls(m.ar)}">${pct(m.ar,1)}</td><td class="n">${pct(m.ak,1)}</td><td class="n">${Number.isFinite(m.rr)?m.rr.toFixed(2):"–"}</td><td><button class="add" data-add="${esc(x.sym)}" ${held.has(x.sym)?"disabled>Added":">+ Add"}</button></td></tr>`).join("")}</tbody>`;
-  if(rows.length>300)$("#stab").insertAdjacentHTML("beforeend",`<tbody><tr><td colspan="8" class="note">Showing the first 300. Search or pick a sector to narrow the list.</td></tr></tbody>`);
+  $("#stab").innerHTML=`<thead><tr><th>Stock</th><th class="hide-s">Sector</th><th class="hide-s">Last ₹</th><th class="hide-s">Today</th><th>Return</th><th>Risk</th><th>Sharpe</th><th class="hide-s">Beta</th><th></th></tr></thead><tbody>${
+    rows.slice(0,300).map(({x,m})=>`<tr><td><b>${esc(x.sym)}</b><br><span class="note" style="margin:0">${esc(x.name.length>20?x.name.slice(0,19)+"…":x.name)}</span></td><td class="hide-s">${esc(x.ind||"Other")}</td><td class="n hide-s">${num(x.last)}</td><td class="n hide-s ${cls(x.chg||0)}">${pct(x.chg,1)}</td><td class="n ${cls(m.ar)}">${pct(m.ar,1)}</td><td class="n">${pct(m.ak,1)}</td><td class="n">${Number.isFinite(m.rr)?m.rr.toFixed(2):"–"}</td><td class="n hide-s">${Number.isFinite(m.beta)?m.beta.toFixed(2):"–"}</td><td><button class="add" data-add="${esc(x.sym)}" ${held.has(x.sym)?"disabled>Added":">+ Add"}</button></td></tr>`).join("")}</tbody>`;
+  if(rows.length>300)$("#stab").insertAdjacentHTML("beforeend",`<tbody><tr><td colspan="9" class="note">Showing the first 300. Search or pick a sector to narrow the list.</td></tr></tbody>`);
 }
 const views={home:["t-home",viewHome],screen:["t-screen",viewScreen],portfolio:["t-portfolio",viewPortfolio],pair:["t-pair",viewPair],single:["t-single",viewSingle],learn:["t-learn",viewLearn]};
 function route(){

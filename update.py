@@ -271,7 +271,21 @@ def main():
             seen.add(sym)
             stocks.append((sym, name, ind))
 
+    global MKT
     nse_date, nse = nse_closes()
+    nifty = None
+    df = download(["^NSEI"])
+    s = None if df is None else closes(df, "^NSEI")
+    if s is not None and len(s) > 30:
+        MKT = s
+        nd = [d.strftime("%Y-%m-%d") for d in s.index]
+        nv = [round(float(v), 2) for v in s.values]
+        with open(os.path.join(OUT, "_NIFTY50.json"), "w", encoding="utf-8") as f:
+            json.dump({"s": "NIFTY 50", "d": nd, "c": nv}, f, separators=(",", ":"))
+        nifty = {"last": nv[-1], "date": nd[-1], "m": metrics(nd, nv)}
+        print(f"Nifty 50: {len(nv)} days")
+    else:
+        print("Nifty 50 download failed; beta will be blank")
     saved, failed, from_nse = [], [], 0
     for i in range(0, len(stocks), BATCH):
         part = stocks[i:i + BATCH]
@@ -312,14 +326,19 @@ def main():
     with open(os.path.join(OUT, "meta.json"), "w", encoding="utf-8") as f:
         json.dump({"updated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes"),
                    "count": len(saved), "failed": failed, "nse_date": nse_date, "nse_count": from_nse,
+                   "nifty": nifty,
                    "source": (f"Latest close: NSE bhavcopy {nse_date}. " if nse_date else "")
                              + "History: Yahoo Finance daily closes, split and bonus adjusted"}, f)
     print(f"Saved {len(saved)} stocks ({from_nse} with NSE's official close). Failed: {len(failed)} {failed[:20]}")
 
 
+MKT = None  # Nifty 50 daily closes (pandas Series), set in main()
+
+
 def metrics(dates, vals):
-    """Annual return, annual risk, price return and CAGR for 1, 3, 5 and 10 years.
-    Same formulas as the website: daily returns, mean x 252, sample SD x sqrt(252)."""
+    """Annual return, annual risk, price return, CAGR and beta vs Nifty 50 for 1, 3, 5 and 10 years.
+    Same formulas as the website: daily returns, mean x 252, sample SD x sqrt(252),
+    beta = covariance(stock, Nifty 50) / variance(Nifty 50) on the same days."""
     s = pd.Series(vals, index=pd.to_datetime(dates))
     end, out = s.index[-1], {}
     for y in (1, 3, 5, 10):
@@ -330,8 +349,13 @@ def metrics(dates, vals):
         r = p.pct_change().dropna()
         days = (p.index[-1] - p.index[0]).days
         growth = p.iloc[-1] / p.iloc[0]
+        beta = None
+        if MKT is not None:
+            both = pd.concat([p, MKT[MKT.index >= p.index[0]]], axis=1, join="inner").pct_change().dropna()
+            if len(both) > 20 and both.iloc[:, 1].var() > 0:
+                beta = round(float(both.iloc[:, 0].cov(both.iloc[:, 1]) / both.iloc[:, 1].var()), 3)
         out[str(y)] = [round(float(r.mean() * 252), 4), round(float(r.std(ddof=1) * 252 ** 0.5), 4),
-                       round(float(growth - 1), 4), round(float(growth ** (365.25 / days) - 1), 4)]
+                       round(float(growth - 1), 4), round(float(growth ** (365.25 / days) - 1), 4), beta]
     return out
 
 
