@@ -202,7 +202,7 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
       <a href="#portfolio"><div class="panel"><h3>Risk, return and sectors</h3><p>Your portfolio's yearly risk and return, how much risk mixing removes, each stock's share of risk, correlations and sector split.</p><span class="go">See my portfolio →</span></div></a>
       <a href="#pair"><div class="panel"><h3>Two-stock mixer</h3><p>Slide the weight between any two stocks and see the risk change, with the lowest-risk mix marked.</p><span class="go">Mix two stocks →</span></div></a>
       <a href="#single"><div class="panel"><h3>One-stock deep dive</h3><p>Price chart, CAGR, daily and yearly risk, best and worst day, and the biggest fall from a peak.</p><span class="go">Study a stock →</span></div></a>
-      <a href="#screen"><div class="panel"><h3>Nifty 500 screener</h3><p>Filter by sector and sort by return, risk or return per unit of risk. Add any stock to your portfolio in one tap.</p><span class="go">Screen stocks →</span></div></a>
+      <a href="#screen"><div class="panel"><h3>Stock screener</h3><p>Screen the Nifty 500 or every NSE-listed stock. Filter by sector and sort by Sharpe ratio, return, risk, CAGR or beta. Add any stock to your portfolio in one tap.</p><span class="go">Screen stocks →</span></div></a>
       <a href="#portfolio"><div class="panel"><h3>Optimiser and efficient frontier</h3><p>Find the lowest-risk and best-Sharpe weights for your stocks, see the efficient frontier, and apply the weights in one tap. Download everything for Excel.</p><span class="go">Optimise my portfolio →</span></div></a>
       <a href="#learn"><div class="panel"><h3>Formulas explained</h3><p>Variance, standard deviation, covariance, correlation and portfolio risk in plain words, the same way you would do them in Excel.</p><span class="go">Learn the maths →</span></div></a>
     </div>
@@ -230,6 +230,7 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
   <h2>Screener</h2>
   <div class="ctl">
     <input id="sq" type="search" placeholder="Search name or symbol" aria-label="Search">
+    <select id="suni" aria-label="Stocks to show"><option value="n5">Nifty 500 stocks</option><option value="all">All NSE stocks</option><option value="other">Outside Nifty 500</option></select>
     <select id="ssec" aria-label="Sector"></select>
     <label style="display:flex;align-items:center;gap:6px;font-size:14px;flex:0 1 auto">Risk-free %<input id="srf" inputmode="decimal" style="width:80px"></label>
     <select id="ssort" aria-label="Sort">
@@ -433,9 +434,12 @@ function pick(title,cb,taken){
 }
 function drawList(taken){
   const q=$("#pq").value.trim().toLowerCase();
-  const rows=LIST.filter(x=>!q||x.sym.toLowerCase().includes(q)||x.name.toLowerCase().includes(q));
-  $("#plist").innerHTML=rows.length?rows.map(x=>`<button type="button" data-s="${esc(x.sym)}" ${taken.includes(x.sym)?"disabled":""}><span><b>${esc(x.sym)}</b>${esc(x.name)}</span><span class="px">₹${num(x.last)}<br><span class="${cls(x.chg||0)}">${x.chg==null?"":pct(x.chg,1)}</span></span></button>`).join("")
-    :`<p class="note" style="padding:12px">No stock matches “${esc(q)}”.</p>`;
+  const score=x=>{const s=x.sym.toLowerCase(),n=x.name.toLowerCase();return s===q?0:s.startsWith(q)?1:n.startsWith(q)?2:x.n5?3:4};
+  let rows=LIST.filter(x=>!q||x.sym.toLowerCase().includes(q)||x.name.toLowerCase().includes(q));
+  if(q)rows.sort((a,b)=>score(a)-score(b));else rows=rows.filter(x=>x.n5||!LIST.some(y=>y.n5));
+  const more=rows.length>150;rows=rows.slice(0,150);
+  $("#plist").innerHTML=(rows.length?rows.map(x=>`<button type="button" data-s="${esc(x.sym)}" ${taken.includes(x.sym)?"disabled":""}><span><b>${esc(x.sym)}</b>${esc(x.name)}</span><span class="px">₹${num(x.last)}<br><span class="${cls(x.chg||0)}">${x.chg==null?"":pct(x.chg,1)}</span></span></button>`).join("")
+    :`<p class="note" style="padding:12px">No stock matches “${esc(q)}”.</p>`)+(more||!q?`<p class="note" style="padding:8px 12px">${q?"Showing the first 150 matches. Type more letters to narrow.":`Showing Nifty 500 stocks. Type a name or symbol to search all ${LIST.length} NSE stocks.`}</p>`:"");
 }
 $("#pq").addEventListener("input",()=>drawList(JSON.parse($("#pick").dataset.taken||"[]")));
 $("#plist").addEventListener("click",ev=>{const b=ev.target.closest("button[data-s]");if(!b)return;closePick();if(pickCb)pickCb(b.dataset.s)});
@@ -687,7 +691,7 @@ function viewLearn(){
 }
 
 function toast(msg){const el=$("#toast");el.textContent=msg;el.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove("on"),1800)}
-const sectorOf=s=>(STOCKS[s]&&STOCKS[s].ind)||"Other";
+const sectorOf=s=>(STOCKS[s]&&STOCKS[s].ind)||"Not classified";
 function healthHTML(use,w,P){
   const n=use.length,sec={};use.forEach((h,i)=>{const s=sectorOf(h.sym);sec[s]=(sec[s]||0)+w[i]});
   const secs=Object.entries(sec).sort((a,b)=>b[1]-a[1]),im=w.indexOf(Math.max(...w)),wmax=w[im],smax=secs[0][1];
@@ -713,7 +717,7 @@ function metric(x,y){const m=x.m&&x.m[String(y)];return m?{ar:m[0],ak:m[1],pr:m[
 function viewHome(){
   const ups=LIST.filter(x=>x.chg>0).length,downs=LIST.filter(x=>x.chg<0).length,last=LIST.map(x=>x.date).sort().at(-1);
   $("#hstrip").innerHTML=`<span><b>${LIST.length}</b>NSE stocks</span><span><b>${esc(fmtD(last))}</b>latest prices</span><span><b><span class="pos">${ups}</span> / <span class="neg">${downs}</span></b>up / down that day</span>`;
-  const y=state.period,pts=LIST.map(x=>({x,m:metric(x,y)})).filter(p=>p.m&&Number.isFinite(p.m.ak));
+  const anyN5=LIST.some(x=>x.n5),y=state.period,pts=LIST.filter(x=>!anyN5||x.n5).map(x=>({x,m:metric(x,y)})).filter(p=>p.m&&Number.isFinite(p.m.ak));
   $("#htitle").textContent=`${sample?"Sample stocks":"Nifty 500"}: risk vs return, last ${y} year${y>1?"s":""}`;
   if(!pts.length){$("#hfig").innerHTML=`<p class="load">No data for this period yet.</p>`;return}
   const lim=(a,q)=>{const s=a.slice().sort((p,r)=>p-r);return s[Math.min(s.length-1,Math.floor(q*(s.length-1)))]};
@@ -725,9 +729,10 @@ function viewHome(){
   const nm0=STOCKS[IDX]?metric(STOCKS[IDX],y):null;
   draw($("#hfig"),(W,H)=>scatter(W,H,[...shown.map(p=>({x:p.m.ak,y:p.m.ar,small:1,label:(p===best||p===big)?p.x.sym:""})),...(nm0?[{x:nm0.ak,y:nm0.ar,label:"NIFTY 50",main:1}]:[])]));
 }
-let scrSort="rr";
+let scrSort="rr",scrUni="n5";
 function viewScreen(){
-  const secs=[...new Set(LIST.map(x=>x.ind||"Other"))].sort();
+  const secs=[...new Set(LIST.map(x=>x.ind||"Not classified"))].sort();
+  $("#suni").value=scrUni;$("#suni").addEventListener("input",()=>{scrUni=$("#suni").value;drawScreen()});
   $("#ssec").innerHTML=`<option value="">All sectors</option>`+secs.map(s=>`<option>${esc(s)}</option>`).join("");
   $("#ssort").value=scrSort;$("#srf").value=(state.rf*100).toFixed(2);
   $("#srf").onchange=()=>{const v=parseFloat($("#srf").value);if(Number.isFinite(v)&&v>=0&&v<30){state.rf=v/100;save();drawScreen()}};
@@ -738,13 +743,14 @@ function viewScreen(){
 }
 function drawScreen(){
   const q=$("#sq").value.trim().toLowerCase(),sec=$("#ssec").value,y=state.period;scrSort=$("#ssort").value;
-  let rows=LIST.map(x=>({x,m:metric(x,y)})).filter(r=>r.m&&(!sec||(r.x.ind||"Other")===sec)&&(!q||r.x.sym.toLowerCase().includes(q)||r.x.name.toLowerCase().includes(q)));
+  const anyN5=LIST.some(x=>x.n5),uni=r=>!anyN5||scrUni==="all"||(scrUni==="n5"?r.x.n5:!r.x.n5);
+  let rows=LIST.map(x=>({x,m:metric(x,y)})).filter(r=>r.m&&uni(r)&&(!sec||(r.x.ind||"Not classified")===sec)&&(!q||r.x.sym.toLowerCase().includes(q)||r.x.name.toLowerCase().includes(q)));
   const key={lowb:r=>Number.isFinite(r.m.beta)?r.m.beta:99,rr:r=>-r.m.rr,ar:r=>-r.m.ar,lowk:r=>r.m.ak,cagr:r=>-r.m.cagr,chg:r=>-(r.x.chg||0)}[scrSort];
   rows.sort((a,b)=>key(a)-key(b));
   const held=new Set(state.holdings.map(h=>h.sym));
   $("#scount").textContent=`${rows.length} stock${rows.length===1?"":"s"} · period ${y} year${y>1?"s":""}`;
   $("#stab").innerHTML=`<thead><tr><th>Stock</th><th class="hide-s">Sector</th><th class="hide-s">Last ₹</th><th class="hide-s">Today</th><th>Return</th><th>Risk</th><th>Sharpe</th><th class="hide-s">Beta</th><th></th></tr></thead><tbody>${
-    rows.slice(0,300).map(({x,m})=>`<tr><td><b>${esc(x.sym)}</b><br><span class="note" style="margin:0">${esc(x.name.length>20?x.name.slice(0,19)+"…":x.name)}</span></td><td class="hide-s">${esc(x.ind||"Other")}</td><td class="n hide-s">${num(x.last)}</td><td class="n hide-s ${cls(x.chg||0)}">${pct(x.chg,1)}</td><td class="n ${cls(m.ar)}">${pct(m.ar,1)}</td><td class="n">${pct(m.ak,1)}</td><td class="n">${Number.isFinite(m.rr)?m.rr.toFixed(2):"–"}</td><td class="n hide-s">${Number.isFinite(m.beta)?m.beta.toFixed(2):"–"}</td><td><button class="add" data-add="${esc(x.sym)}" ${held.has(x.sym)?"disabled>Added":">+ Add"}</button></td></tr>`).join("")}</tbody>`;
+    rows.slice(0,300).map(({x,m})=>`<tr><td><b>${esc(x.sym)}</b><br><span class="note" style="margin:0">${esc(x.name.length>20?x.name.slice(0,19)+"…":x.name)}</span></td><td class="hide-s">${esc(x.ind||"Not classified")}</td><td class="n hide-s">${num(x.last)}</td><td class="n hide-s ${cls(x.chg||0)}">${pct(x.chg,1)}</td><td class="n ${cls(m.ar)}">${pct(m.ar,1)}</td><td class="n">${pct(m.ak,1)}</td><td class="n">${Number.isFinite(m.rr)?m.rr.toFixed(2):"–"}</td><td class="n hide-s">${Number.isFinite(m.beta)?m.beta.toFixed(2):"–"}</td><td><button class="add" data-add="${esc(x.sym)}" ${held.has(x.sym)?"disabled>Added":">+ Add"}</button></td></tr>`).join("")}</tbody>`;
   if(rows.length>300)$("#stab").insertAdjacentHTML("beforeend",`<tbody><tr><td colspan="9" class="note">Showing the first 300. Search or pick a sector to narrow the list.</td></tr></tbody>`);
 }
 const views={home:["t-home",viewHome],screen:["t-screen",viewScreen],portfolio:["t-portfolio",viewPortfolio],pair:["t-pair",viewPair],single:["t-single",viewSingle],learn:["t-learn",viewLearn]};

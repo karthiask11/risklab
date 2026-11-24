@@ -23,6 +23,8 @@ import yfinance as yf
 OUT = "data"
 PERIOD = "10y"
 BATCH = 40
+EQUITY_URL = "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv"  # every stock listed on NSE
+N500 = set()  # Nifty 500 symbols, marked "n5" in stocks.json
 LIST_URLS = [
     "https://nsearchives.nseindia.com/content/indices/ind_nifty500list.csv",
     "https://www.niftyindices.com/IndexConstituent/ind_nifty500list.csv",
@@ -150,7 +152,8 @@ def stock_list():
             rows = [(str(s).strip(), str(n).strip(), str(i).strip())
                     for s, n, i in zip(df["Symbol"], df["Company Name"], df["Industry"])]
             if len(rows) >= 100:
-                print(f"Stock list: {len(rows)} stocks from {url}")
+                print(f"Nifty 500 list: {len(rows)} stocks from {url}")
+                N500.update(s for s, _, _ in rows)
                 return rows
         except Exception as e:  # noqa: BLE001
             print(f"Could not read {url}: {e}")
@@ -159,9 +162,33 @@ def stock_list():
         with open(path, encoding="utf-8") as f:
             old = json.load(f)["stocks"]
         print(f"Using the saved list of {len(old)} stocks")
+        N500.update(s["sym"] for s in old if s.get("n5"))
         return [(s["sym"], s["name"], s.get("ind", "")) for s in old]
     print("Using the built-in Nifty 100 list")
+    N500.update(s for s, _ in FALLBACK)
     return [(s, n, "") for s, n in FALLBACK]
+
+
+def all_equities():
+    """Every equity listed on NSE (series EQ and BE) from NSE's EQUITY_L file. Returns [] if NSE can't be reached."""
+    try:
+        s = requests.Session()
+        s.headers.update(HEADERS)
+        try:
+            s.get("https://www.nseindia.com", timeout=20)
+        except Exception:  # noqa: BLE001
+            pass
+        r = s.get(EQUITY_URL, timeout=30)
+        r.raise_for_status()
+        df = pd.read_csv(io.StringIO(r.text))
+        df.columns = [c.strip() for c in df.columns]
+        df = df[df["SERIES"].astype(str).str.strip().isin(["EQ", "BE"])]
+        rows = [(str(s).strip(), str(n).strip(), "") for s, n in zip(df["SYMBOL"], df["NAME OF COMPANY"])]
+        print(f"All NSE equities: {len(rows)} stocks")
+        return rows
+    except Exception as e:  # noqa: BLE001
+        print(f"Could not read the full NSE list: {e}")
+        return []
 
 
 def nse_closes():
@@ -266,7 +293,7 @@ def download(tickers):
 def main():
     os.makedirs(OUT, exist_ok=True)
     seen, stocks = set(), []
-    for sym, name, ind in stock_list() + extra_stocks():
+    for sym, name, ind in stock_list() + extra_stocks() + all_equities():
         if sym not in seen:
             seen.add(sym)
             stocks.append((sym, name, ind))
@@ -315,7 +342,7 @@ def main():
                 json.dump({"s": sym, "d": dates, "c": vals}, f, separators=(",", ":"))
             saved.append(entry(sym, name, ind, dates, vals))
         print(f"{min(i + BATCH, len(stocks))}/{len(stocks)} done")
-        time.sleep(2)
+        time.sleep(3)
 
     if not saved:
         print("No prices downloaded; keeping existing data.")
@@ -363,7 +390,7 @@ def entry(sym, name, ind, dates, vals):
     prev = vals[-2] if len(vals) > 1 else vals[-1]
     return {"sym": sym, "name": name, "ind": ind, "file": file_name(sym),
             "last": vals[-1], "date": dates[-1], "chg": round(vals[-1] / prev - 1, 4),
-            "from": dates[0], "m": metrics(dates, vals)}
+            "from": dates[0], "m": metrics(dates, vals), **({"n5": 1} if sym in N500 else {})}
 
 
 if __name__ == "__main__":
