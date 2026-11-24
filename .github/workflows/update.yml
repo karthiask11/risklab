@@ -1,0 +1,45 @@
+name: Update prices and website
+
+on:
+  schedule:
+    - cron: "0 15 * * 1-5"    # 8:30 pm India time, Monday to Friday (after NSE publishes the bhavcopy)
+  workflow_dispatch:           # "Run workflow" button
+  push:
+    branches: [main]
+    paths-ignore: ["data/**"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: prices
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet yfinance pandas requests
+      - run: python update.py
+      - name: Save prices to the repository
+        run: |
+          git config user.name "price-bot"
+          git config user.email "price-bot@users.noreply.github.com"
+          git add data
+          git commit -m "Prices $(date -u +%F)" || echo "No changes"
+          git push
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deploy
+        uses: actions/deploy-pages@v4

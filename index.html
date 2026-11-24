@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portfolio Risk Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE work: a money tool, calm and exact, like a central bank bulletin
+   IDEA a risk desk's portfolio sheet: holdings on one side, the verdict drawn beside it
+   PICTURE live risk-vs-return chart: each stock a dot, the portfolio a large ring
+   COLOUR white ground, ink #14161a, deep teal #0b5d63 leads, red only for losses; night #0d1416
+   TYPE Libre Caslon Text for titles and big figures + Inter for everything else
+   LAYOUT laptop: editor left, result right; phone: title, result, editor, details */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0d1416);--ink:light-dark(#14161a,#e4ecec);--mute:light-dark(#5b6670,#93a4a8);--rule:light-dark(#dde3e5,#22343a);--soft:light-dark(#f2f6f6,#132026);--teal:light-dark(#0b5d63,#5cc0bc);--tealbg:light-dark(#e3f0ef,#123236);--red:light-dark(#b42318,#ff7b6e);--band:light-dark(#0b5d63,#0f2a2e)}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;overflow-x:clip}
+h1,h2,.big{font-family:"Libre Caslon Text",Georgia,serif;letter-spacing:-.02em;line-height:1.05;margin:0}
+h1{font-size:clamp(28px,4vw,42px)}
+h2{font-size:22px;margin-bottom:12px}
+.top{background:var(--band);color:#fff;padding:20px max(5vw,16px) 16px}
+.status{font-size:14px;color:#cfe5e3;margin:6px 0 14px}
+.status b{color:#fff}
+.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tabs a{color:#fff;text-decoration:none;padding:9px 14px;border-radius:999px;background:rgba(255,255,255,.12);font-weight:600;font-size:15px;white-space:nowrap}
+.tabs a[aria-current]{background:#fff;color:#0b5d63}
+.seg{display:inline-flex;border:1px solid rgba(255,255,255,.5);border-radius:999px;overflow:hidden}
+.seg button{background:transparent;color:#fff;border:0;padding:0 13px;min-height:40px;font:600 14px Inter,sans-serif;cursor:pointer}
+.seg button[aria-pressed=true]{background:#fff;color:#0b5d63}
+main{padding:22px max(5vw,16px) 48px;max-width:1340px;margin:0 auto}
+.grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:28px;align-items:start}
+.panel{border:1px solid var(--rule);border-radius:12px;padding:16px;background:var(--bg)}
+.soft{background:var(--soft);border-color:transparent}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 6px;border-bottom:1px solid var(--rule);text-align:right;white-space:nowrap}
+th{font-weight:600;color:var(--mute);font-size:13px}
+th:first-child,td:first-child{text-align:left}
+td.n{font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+input{font:16px Inter,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;min-height:44px}
+input:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.btn{font:600 15px Inter,sans-serif;border-radius:8px;border:1px solid var(--teal);background:var(--teal);color:var(--bg);padding:0 16px;min-height:44px;cursor:pointer}
+.btn.ghost{background:var(--bg);color:var(--teal)}
+.pickbtn{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;font:600 17px Inter,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:8px 12px;min-height:52px;cursor:pointer}
+.pickbtn small{display:block;font:400 13px Inter,sans-serif;color:var(--mute)}
+.pickbtn::after{content:"▾";color:var(--teal);font-size:18px}
+.h{background:var(--bg);border:1px solid var(--rule);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.hh{display:flex;align-items:center;gap:8px}
+.hh .nm{flex:1;font-size:13px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rm{border:1px solid var(--rule);background:var(--bg);color:var(--red);font:600 14px Inter,sans-serif;border-radius:8px;min-height:40px;padding:0 12px;cursor:pointer}
+.hf{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:flex-end;margin-top:8px}
+.hf label{display:grid;font-size:13px;color:var(--mute);gap:2px}
+.hf input{width:104px;text-align:right}
+.hf input[type=radio]{width:auto;min-height:auto}
+.hf .kv{font-size:13px;color:var(--mute)}
+.hf .kv b{display:block;font:600 15px Inter,sans-serif;color:var(--ink);font-variant-numeric:tabular-nums}
+.warn{color:var(--red);font-size:13px;margin-top:6px}
+.figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(9em,1fr));gap:14px;margin-bottom:14px}
+.fig1 .lab{font-size:13px;color:var(--mute)}
+.big{font-size:clamp(30px,4vw,44px);white-space:nowrap}
+.mid{font:600 22px Inter,sans-serif;white-space:nowrap}
+.pos{color:var(--teal)}.neg{color:var(--red)}
+.note{font-size:13px;color:var(--mute);margin:8px 0 0}
+.fig{position:relative;min-height:330px}
+.fig>svg{position:absolute;inset:0;width:100%;height:100%}
+svg text{font:13px Inter,sans-serif;fill:var(--mute);paint-order:stroke;stroke:var(--bg);stroke-width:4px}
+svg .lbl{fill:var(--ink);font-weight:600}
+.meter{height:10px;background:var(--soft);border-radius:5px;overflow:hidden;min-width:60px}
+.meter i{display:block;height:100%;background:var(--teal)}
+.steps td:first-child{white-space:normal}
+details{margin-top:16px;border-top:1px solid var(--rule);padding-top:10px}
+summary{cursor:pointer;font-weight:600;color:var(--teal);min-height:40px;display:flex;align-items:center}
+.load{padding:28px 0;color:var(--mute)}
+.err{color:var(--red);font-size:14px}
+.banner{background:#fff3cd;color:#5c4400;border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:16px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(16em,1fr));gap:16px}
+.cards .panel h3{margin:0 0 6px;font-size:17px}
+code{font-size:14px;background:var(--soft);padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}
+section+section{margin-top:28px}
+input[type=range]{width:100%;accent-color:var(--teal);min-height:32px;padding:0;border:0}
+dialog{border:0;border-radius:14px;padding:0;width:min(560px,94vw);max-height:86vh;background:var(--bg);color:var(--ink);box-shadow:0 10px 40px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dh{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px}
+.dh h2{margin:0;font-size:20px}
+.x{border:0;background:transparent;color:var(--mute);font-size:26px;min-width:44px;min-height:44px;cursor:pointer}
+#pq{margin:0 16px 8px;width:calc(100% - 32px)}
+#plist{overflow-y:auto;max-height:calc(86vh - 130px);padding:0 8px 12px}
+#plist button{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid var(--rule);padding:10px 8px;min-height:52px;color:var(--ink);font:15px Inter,sans-serif;cursor:pointer}
+#plist button:hover{background:var(--soft)}
+#plist b{display:block}
+#plist span{color:var(--mute);font-size:13px}
+#plist .px{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+#plist button[disabled]{opacity:.45}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22em),1fr));gap:20px;align-items:start}
+.hero{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:28px;align-items:center}
+.hero h2{font-size:clamp(32px,4.4vw,50px);margin-bottom:14px}
+.hero p{font-size:17px;max-width:46ch;margin:0 0 18px}
+.strip{display:flex;flex-wrap:wrap;gap:8px 22px;margin:18px 0 0;font-size:14px;color:var(--mute)}
+.strip b{color:var(--ink);font-size:18px;display:block}
+.cards a{color:inherit;text-decoration:none}
+.cards a .panel{height:100%}
+.cards a:hover .panel{border-color:var(--teal)}
+.cards .go{color:var(--teal);font-weight:600;font-size:14px}
+.steps3{display:grid;grid-template-columns:repeat(auto-fit,minmax(14em,1fr));gap:16px;counter-reset:s}
+.steps3 div{border-top:3px solid var(--teal);padding-top:10px}
+.faq details{border-top:1px solid var(--rule);margin:0;padding:6px 0}
+.faq p{margin:4px 0 10px;color:var(--mute)}
+.score{display:flex;align-items:baseline;gap:10px}
+.score .big{font-size:clamp(44px,6vw,64px)}
+.bars div{display:grid;grid-template-columns:minmax(7em,11em) minmax(0,1fr) 3.2em;gap:10px;align-items:center;font-size:14px;margin:6px 0}
+.bars .v{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tips{margin:10px 0 0;padding-left:20px;font-size:14px}
+.tips li{margin:4px 0}
+.ctl{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.ctl input,.ctl select{flex:1 1 11em}
+select{font:16px Inter,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;min-height:44px}
+.add{border:1px solid var(--teal);background:var(--bg);color:var(--teal);font:600 14px Inter,sans-serif;border-radius:8px;min-height:36px;padding:0 10px;cursor:pointer}
+.add[disabled]{border-color:var(--rule);color:var(--mute)}
+th.sort{cursor:pointer;color:var(--teal)}
+#stab td:first-child{white-space:normal;max-width:10em}
+@media(max-width:600px){#stab .add{padding:0 8px}#stab td:first-child{max-width:7.5em}}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13px;color:var(--mute)}
+@media(max-width:900px){.hero{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.hide-s{display:none}.bars div{grid-template-columns:minmax(6em,8em) minmax(0,1fr) 3em}}
+@media(max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}.result{order:-1}}
+@media(max-width:600px){table{font-size:13px}th,td{padding:6px 4px}.fig{min-height:270px}.tabs a{padding:8px 11px;font-size:14px}}
+@media(prefers-reduced-motion:no-preference){.ring{transition:cx .4s,cy .4s}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Portfolio Risk Lab</h1>
+  <p class="status" id="status">Loading prices…</p>
+  <div class="bar">
+    <nav class="tabs" id="tabs">
+      <a href="#home">Home</a><a href="#portfolio">Portfolio</a><a href="#pair">Two stocks</a><a href="#single">One stock</a><a href="#screen">Screener</a><a href="#learn">Formulas</a>
+    </nav>
+    <div class="seg" id="period" role="group" aria-label="Period">
+      <button data-y="1" aria-pressed="true">1Y</button><button data-y="3" aria-pressed="false">3Y</button><button data-y="5" aria-pressed="false">5Y</button><button data-y="10" aria-pressed="false">10Y</button>
+    </div>
+  </div>
+</header>
+<main id="main"></main>
+<footer>Portfolio Risk Lab · Free and for learning, not investment advice · Prices: NSE bhavcopy (latest close) and Yahoo Finance (history)</footer>
+<div class="toast" id="toast" role="status"></div>
+
+<dialog id="pick">
+  <div class="dh"><h2 id="ptitle">Choose a stock</h2><button class="x" id="pclose" aria-label="Close">×</button></div>
+  <input id="pq" type="search" placeholder="Search name or symbol" autocomplete="off">
+  <div id="plist"></div>
+</dialog>
+
+<template id="t-home">
+  <section class="hero">
+    <div>
+      <h2>Know the risk before you invest.</h2>
+      <p>A free risk and return calculator for NSE stocks. Check your portfolio's health, mix two stocks, or screen the Nifty 500. Every number shows its formula.</p>
+      <div class="row" style="display:flex;flex-wrap:wrap;gap:10px"><a class="btn" href="#portfolio" style="display:inline-flex;align-items:center;text-decoration:none">Check my portfolio</a><a class="btn ghost" href="#screen" style="display:inline-flex;align-items:center;text-decoration:none">Open the screener</a></div>
+      <div class="strip" id="hstrip"></div>
+    </div>
+    <div class="panel">
+      <h3 style="margin:0 0 4px;font-size:16px" id="htitle">Risk vs return</h3>
+      <div class="fig" id="hfig" style="min-height:300px"><svg role="img" aria-label="Risk and return of every stock"></svg></div>
+      <p class="note" id="hnote"></p>
+    </div>
+  </section>
+  <section>
+    <h2>What you can do</h2>
+    <div class="cards">
+      <a href="#portfolio"><div class="panel"><h3>Portfolio health score</h3><p>A 0–10 score for diversification, from your number of stocks, biggest holding, biggest sector and how alike your stocks move, with tips to improve it.</p><span class="go">Check my portfolio →</span></div></a>
+      <a href="#portfolio"><div class="panel"><h3>Risk, return and sectors</h3><p>Your portfolio's yearly risk and return, how much risk mixing removes, each stock's share of risk, correlations and sector split.</p><span class="go">See my portfolio →</span></div></a>
+      <a href="#pair"><div class="panel"><h3>Two-stock mixer</h3><p>Slide the weight between any two stocks and see the risk change, with the lowest-risk mix marked.</p><span class="go">Mix two stocks →</span></div></a>
+      <a href="#single"><div class="panel"><h3>One-stock deep dive</h3><p>Price chart, CAGR, daily and yearly risk, best and worst day, and the biggest fall from a peak.</p><span class="go">Study a stock →</span></div></a>
+      <a href="#screen"><div class="panel"><h3>Nifty 500 screener</h3><p>Filter by sector and sort by return, risk or return per unit of risk. Add any stock to your portfolio in one tap.</p><span class="go">Screen stocks →</span></div></a>
+      <a href="#learn"><div class="panel"><h3>Formulas explained</h3><p>Variance, standard deviation, covariance, correlation and portfolio risk in plain words, the same way you would do them in Excel.</p><span class="go">Learn the maths →</span></div></a>
+    </div>
+  </section>
+  <section>
+    <h2>How it works</h2>
+    <div class="steps3">
+      <div><b>1. Prices update every evening</b><p class="note">After the market closes, NSE's official closing prices for the Nifty 500 are added to up to 10 years of split- and bonus-adjusted history.</p></div>
+      <div><b>2. Add what you own</b><p class="note">Pick stocks from the list and enter quantity and buy price, or set weights. Your holdings stay in your own browser.</p></div>
+      <div><b>3. Read the result</b><p class="note">Choose 1, 3, 5 or 10 years. Risk, return, health score and every step of the calculation update at once.</p></div>
+    </div>
+  </section>
+  <section class="faq">
+    <h2>Questions</h2>
+    <details><summary>Where do the prices come from?</summary><p>The latest day's price is NSE's official closing price from the NSE bhavcopy (NSE's end-of-day price file). Older daily prices come from Yahoo Finance, adjusted for splits and bonus issues but not dividends. Prices update every weekday evening after NSE publishes its file.</p></details>
+    <details><summary>What does "risk" mean here?</summary><p>Risk is the standard deviation of daily returns, turned into a yearly figure (daily SD × √252). It shows how much the return usually swings above or below its average.</p></details>
+    <details><summary>Is this investment advice?</summary><p>No. It measures what happened in the past to help you learn and compare. Past risk and return do not predict the future.</p></details>
+    <details><summary>Is my portfolio private?</summary><p>Yes. Your holdings are saved only in the browser you use and are never sent anywhere.</p></details>
+    <details><summary>Does it cost anything?</summary><p>No. The whole site is free.</p></details>
+  </section>
+</template>
+
+<template id="t-screen">
+  <h2>Screener</h2>
+  <div class="ctl">
+    <input id="sq" type="search" placeholder="Search name or symbol" aria-label="Search">
+    <select id="ssec" aria-label="Sector"></select>
+    <select id="ssort" aria-label="Sort">
+      <option value="rr">Best return per unit of risk</option>
+      <option value="ar">Highest yearly return</option>
+      <option value="lowk">Lowest risk</option>
+      <option value="cagr">Highest CAGR</option>
+      <option value="chg">Today's change</option>
+    </select>
+  </div>
+  <p class="note" id="scount" style="margin:0 0 8px"></p>
+  <div class="scroll"><table id="stab"></table></div>
+  <p class="note">Return and risk are yearly figures for the chosen period (1Y, 3Y, 5Y or 10Y). Return per risk = yearly return ÷ yearly risk; higher is better. Stocks without enough history for the period are hidden.</p>
+</template>
+
+<template id="t-portfolio">
+  <div class="grid">
+    <section class="panel soft">
+      <h2>My holdings</h2>
+      <div class="hf" style="margin:0 0 12px">
+        <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="radio" name="mode" value="qty" style="min-height:auto"> By quantity</label>
+        <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="radio" name="mode" value="wt" style="min-height:auto"> By weight %</label>
+      </div>
+      <div id="hold"></div>
+      <button class="btn" id="addBtn" type="button" style="width:100%">+ Add a stock</button>
+      <p class="note" id="saved">Your holdings are saved in this browser.</p>
+    </section>
+    <section class="result"><div id="pres"></div></section>
+  </div>
+  <div id="pdetail"></div>
+</template>
+
+<template id="t-pair">
+  <div class="grid">
+    <section class="panel soft">
+      <h2>Pick two stocks</h2>
+      <div style="display:grid;gap:10px"><button class="pickbtn" id="pa"></button><button class="pickbtn" id="pb"></button></div>
+      <p style="margin:16px 0 4px;font-size:14px" id="pwl"></p>
+      <input type="range" id="pw" min="0" max="100" step="1" aria-label="Weight in the first stock">
+      <div id="psteps"></div>
+    </section>
+    <section class="result"><div id="pairres"></div></section>
+  </div>
+</template>
+
+<template id="t-single">
+  <div class="grid">
+    <section class="panel soft">
+      <h2>Pick a stock</h2>
+      <button class="pickbtn" id="ss"></button>
+      <div id="sstats" style="margin-top:14px"></div>
+    </section>
+    <section class="result"><div id="sres"></div></section>
+  </div>
+</template>
+
+<template id="t-learn">
+  <h2>How each number is calculated</h2>
+  <div class="cards">
+    <div class="panel"><h3>Daily return</h3><p>R = today's close ÷ yesterday's close − 1. Prices are adjusted for splits and bonus issues, so a 1:1 bonus does not look like a −50% day.</p></div>
+    <div class="panel"><h3>Average and risk (SD)</h3><p>Average = sum of R ÷ n. Variance = Σ(R − average)² ÷ (n − 1). Daily SD = √variance. This is Excel's <code>STDEV.S</code>.</p></div>
+    <div class="panel"><h3>Annual figures</h3><p>Annual return = average daily return × 252. Annual risk = daily SD × √252. Risk grows with the square root of time.</p></div>
+    <div class="panel"><h3>Price return and CAGR</h3><p>Price return = end price ÷ start price − 1. CAGR = (end ÷ start)^(1 ÷ years) − 1, the steady yearly rate.</p></div>
+    <div class="panel"><h3>Covariance and correlation</h3><p>Covariance = Σ(RA − avgA)(RB − avgB) ÷ (n − 1). Correlation ρ = covariance ÷ (SD A × SD B), from −1 to +1. Low ρ means better diversification.</p></div>
+    <div class="panel"><h3>Two-stock risk</h3><p>σp² = wA²σA² + wB²σB² + 2·wA·wB·ρ·σA·σB. Lowest-risk weight in A = (σB² − Cov) ÷ (σA² + σB² − 2·Cov).</p></div>
+    <div class="panel"><h3>Many stocks</h3><p>Return = Σ wᵢ·Rᵢ. Variance = Σᵢ Σⱼ wᵢ·wⱼ·Covᵢⱼ: every pair of stocks adds a covariance term. Risk = √variance.</p></div>
+    <div class="panel"><h3>Share of risk</h3><p>Share from stock i = wᵢ × Σⱼ wⱼ·Covᵢⱼ ÷ portfolio variance. Shares add up to 100%; a stock can add more risk than its weight.</p></div>
+    <div class="panel"><h3>Weights</h3><p>By quantity: weight = quantity × latest price ÷ total value. By weight %: the numbers you type, scaled to add up to 100%.</p></div>
+  </div>
+  <p class="note" id="srcnote"></p>
+</template>
+
+<script>
+{
+const SAMPLE={"dates":["2025-11-24","2025-11-25","2025-11-26","2025-11-27","2025-11-28","2025-12-01","2025-12-02","2025-12-03","2025-12-04","2025-12-05","2025-12-08","2025-12-09","2025-12-10","2025-12-11","2025-12-12","2025-12-15","2025-12-16","2025-12-17","2025-12-18","2025-12-19","2025-12-22","2025-12-23","2025-12-24","2025-12-26","2025-12-29","2025-12-30","2025-12-31","2026-01-01","2026-01-02","2026-01-05","2026-01-06","2026-01-07","2026-01-08","2026-01-09","2026-01-12","2026-01-13","2026-01-14","2026-01-16","2026-01-19","2026-01-20","2026-01-21","2026-01-22","2026-01-23","2026-01-27","2026-01-28","2026-01-29","2026-01-30","2026-02-01","2026-02-02","2026-02-03","2026-02-04","2026-02-05","2026-02-06","2026-02-09","2026-02-10","2026-02-11","2026-02-12","2026-02-13","2026-02-16","2026-02-17","2026-02-18","2026-02-19","2026-02-20","2026-02-23","2026-02-24","2026-02-25","2026-02-26","2026-02-27","2026-03-02","2026-03-04","2026-03-05","2026-03-06","2026-03-09","2026-03-10","2026-03-11","2026-03-12","2026-03-13","2026-03-16","2026-03-17","2026-03-18","2026-03-19","2026-03-20","2026-03-23","2026-03-24","2026-03-25","2026-03-27","2026-03-30","2026-04-01","2026-04-02","2026-04-06","2026-04-07","2026-04-08","2026-04-09","2026-04-10","2026-04-13","2026-04-15","2026-04-16","2026-04-17","2026-04-20","2026-04-21","2026-04-22","2026-04-23","2026-04-24","2026-04-27","2026-04-28","2026-04-29","2026-04-30","2026-05-04","2026-05-05","2026-05-06","2026-05-07","2026-05-08","2026-05-11","2026-05-12","2026-05-13","2026-05-14","2026-05-15","2026-05-18","2026-05-19","2026-05-20","2026-05-21","2026-05-22","2026-05-25","2026-05-26","2026-05-27","2026-05-29","2026-06-01","2026-06-02","2026-06-03","2026-06-04","2026-06-05","2026-06-08","2026-06-09","2026-06-10","2026-06-11","2026-06-12","2026-06-15","2026-06-16","2026-06-17","2026-06-18","2026-06-19","2026-06-22","2026-06-23","2026-06-24","2026-06-25","2026-06-29","2026-06-30","2026-07-01","2026-07-02","2026-07-03","2026-07-06","2026-07-07","2026-07-08","2026-07-09","2026-07-10","2026-07-13","2026-07-14","2026-07-15","2026-07-16","2026-07-17","2026-07-20","2026-07-21","2026-07-22","2026-07-23","2026-07-24","2026-07-27","2026-07-28","2026-07-29","2026-07-30","2026-07-31","2026-08-03","2026-08-04","2026-08-05","2026-08-06","2026-08-07","2026-08-10","2026-08-11","2026-08-12","2026-08-13","2026-08-14","2026-08-17","2026-08-18","2026-08-19","2026-08-20","2026-08-21","2026-08-24","2026-08-25","2026-08-26","2026-08-27","2026-08-28","2026-08-31","2026-09-01","2026-09-02","2026-09-03","2026-09-04","2026-09-07","2026-09-08","2026-09-09","2026-09-10","2026-09-11","2026-09-15","2026-09-16","2026-09-17","2026-09-18","2026-09-21","2026-09-22","2026-09-23","2026-09-24","2026-09-25","2026-09-28","2026-09-29","2026-09-30","2026-10-01","2026-10-05","2026-10-06","2026-10-07","2026-10-08","2026-10-09","2026-10-12","2026-10-13","2026-10-14","2026-10-15","2026-10-16","2026-10-19","2026-10-21","2026-10-22","2026-10-23","2026-10-26","2026-10-27","2026-10-28","2026-10-29","2026-10-30","2026-11-02","2026-11-03","2026-11-04","2026-11-05","2026-11-06","2026-11-08","2026-11-09","2026-11-11","2026-11-12","2026-11-13","2026-11-16","2026-11-17","2026-11-18","2026-11-19","2026-11-20","2026-11-23"],"px":{"TCS":[3141.2,3119.2,3162.9,3136.6,3137.5,3133.4,3135.7,3180.0,3229.2,3238.2,3236.5,3208.3,3189.2,3191.9,3220.5,3230.2,3205.1,3217.8,3280.8,3282.0,3324.9,3310.0,3319.0,3280.0,3251.5,3246.8,3206.2,3227.4,3250.7,3216.1,3255.8,3295.6,3203.9,3207.8,3239.6,3268.0,3192.5,3206.7,3163.6,3102.3,3122.6,3150.4,3162.5,3158.0,3200.1,3144.4,3123.9,3186.9,3169.6,3225.3,2999.1,2991.5,2941.6,2948.2,2984.6,2909.8,2750.1,2692.2,2706.6,2717.4,2694.9,2677.9,2686.2,2676.3,2573.7,2629.3,2647.7,2637.4,2613.5,2587.8,2578.8,2557.6,2527.4,2513.1,2464.9,2442.4,2410.5,2409.2,2391.7,2440.8,2356.0,2390.6,2383.8,2398.8,2377.4,2389.8,2358.9,2408.2,2450.7,2473.9,2539.8,2559.2,2589.0,2524.3,2472.6,2554.9,2576.9,2581.5,2579.6,2610.5,2538.5,2521.8,2396.9,2447.6,2444.7,2474.7,2473.9,2431.3,2427.3,2435.4,2401.4,2394.4,2392.9,2300.3,2272.8,2246.0,2264.0,2283.2,2327.1,2327.4,2327.2,2317.3,2308.2,2276.2,2284.2,2258.9,2297.4,2446.9,2241.7,2241.0,2198.9,2151.4,2151.0,2153.9,2135.6,2161.4,2162.0,2199.0,2223.0,2203.3,2125.0,2127.8,2059.6,2109.0,2094.7,2097.9,2031.5,1982.6,2068.1,2093.5,2057.6,2096.1,2057.5,2049.5,2069.0,2181.5,2200.6,2189.2,2201.0,2269.0,2251.1,2221.1,2208.3,2242.9,2254.3,2295.6,2398.0,2446.6,2431.8,2365.6,2473.7,2460.0,2413.0,2373.0,2452.7,2425.7,2445.7,2349.7,2375.0,2361.0,2313.2,2280.0,2289.0,2298.0,2302.0,2284.1,2296.2,2270.0,2248.4,2342.0,2399.3,2369.0,2348.0,2320.1,2304.0,2270.0,2255.5,2208.0,2204.1,2200.8,2251.0,2188.8,2190.0,2105.0,2128.7,2105.0,2089.6,2087.0,2082.0,2070.7,2032.4,2050.6,2075.0,2114.4,2100.0,2080.3,2076.0,2156.0,2125.0,2269.3,2304.9,2350.0,2465.0,2460.9,2529.0,2506.9,2530.0,2535.0,2496.9,2460.0,2478.0,2502.6,2501.7,2499.1,2436.0,2495.7,2498.5,2498.8,2475.4,2472.1,2442.4,2407.5,2405.0,2406.6,2379.5,2342.7,2376.2,2460.0],"INFY":[1548.0,1530.6,1557.9,1566.4,1560.1,1564.0,1561.0,1578.7,1597.6,1616.2,1610.8,1599.0,1584.8,1598.0,1598.2,1606.8,1592.9,1602.0,1626.8,1638.7,1689.6,1668.3,1663.4,1656.1,1644.7,1621.6,1615.4,1629.8,1640.4,1606.4,1612.2,1639.0,1613.3,1614.1,1595.9,1599.0,1599.8,1689.8,1681.2,1658.9,1654.4,1663.5,1670.8,1682.7,1666.5,1659.5,1641.0,1654.5,1629.4,1656.0,1535.8,1520.2,1507.1,1497.2,1497.8,1471.9,1386.0,1369.1,1365.6,1391.2,1373.7,1370.5,1353.2,1327.5,1275.5,1290.1,1289.1,1300.1,1288.9,1307.4,1305.8,1308.4,1315.0,1295.6,1276.3,1265.8,1248.3,1249.8,1232.9,1267.1,1220.8,1255.9,1256.8,1278.3,1279.1,1269.7,1250.6,1275.7,1300.8,1306.2,1339.4,1346.2,1331.6,1292.5,1276.8,1305.3,1319.2,1318.7,1312.6,1313.2,1268.6,1240.6,1154.6,1170.3,1152.1,1167.5,1181.8,1168.4,1178.1,1167.2,1162.7,1179.2,1177.0,1140.3,1123.1,1095.0,1119.0,1142.5,1196.9,1193.7,1181.2,1174.5,1168.5,1167.7,1159.9,1160.9,1202.5,1270.8,1222.6,1201.3,1197.5,1187.6,1180.3,1145.3,1114.6,1116.4,1134.9,1143.6,1157.7,1127.5,1051.4,1065.4,1029.3,1056.6,1041.2,1036.7,1000.4,985.3,1040.9,1047.2,1042.2,1071.8,1069.3,1050.8,1068.0,1102.6,1092.9,1076.3,1082.4,1096.5,1087.1,1073.5,1052.1,1047.4,1040.9,1079.2,1105.7,1155.6,1155.1,1130.1,1180.0,1167.5,1174.0,1165.0,1175.1,1183.0,1190.7,1176.1,1175.0,1169.2,1139.9,1115.0,1119.8,1130.0,1121.0,1130.0,1144.0,1120.0,1110.8,1144.0,1133.8,1156.0,1140.0,1130.3,1130.0,1087.5,1082.0,1035.0,1036.5,1037.7,1077.0,1060.0,1058.6,1051.4,1038.5,1029.4,1020.5,1014.5,1000.2,1003.2,1015.4,994.1,1035.0,1020.5,1013.85,992.0,997.0,1023.4,1020.0,1062.1,1088.0,1110.0,1161.2,1130.7,1168.0,1153.35,1153.8,1166.0,1163.0,1123.15,1146.5,1185.0,1161.0,1148.1,1128.2,1167.4,1181.4,1171.6,1154.1,1155.0,1151.2,1141.5,1145.1,1130.0,1108.8,1091.9,1098.0,1103.4],"HDFCBANK":[999.15,989.8,1003.9,1009.5,1007.6,1002.1,989.8,1000.5,997.2,1003.3,1003.1,997.1,989.8,1000.3,1001.5,996.1,994.3,984.0,979.7,985.5,987.7,996.6,997.2,992.1,991.7,990.9,991.2,991.15,1001.6,977.5,962.2,949.05,946.7,939.0,936.95,937.35,925.45,931.1,927.9,931.2,920.35,918.7,916.1,926.4,932.7,935.5,929.25,922.1,928.1,948.7,953.1,949.7,941.1,937.25,932.4,927.1,920.6,903.9,925.8,925.7,924.7,915.6,911.85,923.6,910.5,907.6,898.6,887.75,879.4,868.65,877.75,857.05,840.7,849.45,833.95,832.75,817.0,840.6,845.35,843.05,798.2,780.45,744.15,764.9,782.3,756.2,731.55,742.25,750.9,771.0,772.0,816.1,797.7,810.3,794.7,809.9,795.45,799.9,795.45,811.75,799.9,784.35,784.85,789.8,782.55,779.0,771.7,779.4,772.3,796.55,796.05,780.85,763.65,750.45,749.6,769.55,767.5,768.65,762.45,759.5,759.15,766.8,786.85,778.9,758.65,744.55,742.7,748.25,753.65,754.2,747.05,738.65,738.35,746.85,744.6,772.45,777.35,784.9,787.1,799.0,779.8,786.4,774.65,793.2,796.3,798.9,797.95,796.15,795.9,801.05,829.85,829.3,810.3,817.55,824.95,817.95,809.4,815.45,808.3,819.6,777.6,761.45,753.15,747.25,742.8,739.55,735.4,748.2,753.95,748.15,753.0,742.0,735.0,734.3,731.0,731.0,729.0,729.0,725.0,727.0,729.0,723.0,720.0,725.05,726.95,729.0,727.5,727.2,711.0,720.3,709.0,711.9,700.8,706.65,712.1,710.5,703.0,687.1,693.8,708.25,716.55,721.5,713.0,731.0,739.5,738.6,737.25,728.9,735.6,719.05,722.7,708.7,721.2,704.8,711.45,702.75,692.25,707.25,704.9,714.0,710.7,726.85,728.85,712.0,706.95,694.05,692.8,688.05,680.2,685.3,683.3,692.8,700.0,725.5,736.7,760.0,788.25,784.1,798.15,806.6,812.3,804.0,816.5,814.95,808.15,821.8,846.0,817.8]},"names":{"TCS":"Tata Consultancy Services","INFY":"Infosys","HDFCBANK":"HDFC Bank"},"inds":{"TCS":"Information Technology","INFY":"Information Technology","HDFCBANK":"Financial Services"}};
+const TD=252;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pct=(x,d=2)=>Number.isFinite(x)?(x*100).toFixed(d)+"%":"–";
+const num=(x,d=2)=>Number.isFinite(x)?x.toLocaleString("en-IN",{minimumFractionDigits:d,maximumFractionDigits:d}):"–";
+const cls=x=>x<0?"neg":"pos";
+const rs=(x,d=0)=>Number.isFinite(x)?(x<0?"−₹":"₹")+num(Math.abs(x),d):"–";
+const iso=d=>d.toISOString().slice(0,10);
+const addDays=(s,n)=>{const d=new Date(s+"T00:00:00Z");d.setUTCDate(d.getUTCDate()+n);return iso(d)};
+const subYears=(s,y)=>{const d=new Date(s+"T00:00:00Z");d.setUTCFullYear(d.getUTCFullYear()-y);return iso(d)};
+const fmtD=s=>new Date(s+"T00:00:00Z").toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"UTC"});
+
+let STOCKS={},LIST=[],meta=null,sample=false,saveT=null,token=0;
+const store={};
+const state={period:1,mode:"qty",holdings:[{sym:"TCS",qty:10,buy:3100,wt:30},{sym:"INFY",qty:20,buy:1500,wt:30},{sym:"HDFCBANK",qty:40,buy:950,wt:40}],pairA:"TCS",pairB:"HDFCBANK",pairW:50,single:"TCS"};
+const nm=s=>STOCKS[s]?STOCKS[s].name:s;
+
+/* ---------- data ---------- */
+async function boot(){
+  try{
+    const r=await fetch("data/stocks.json",{cache:"no-cache"});if(!r.ok)throw 0;
+    LIST=(await r.json()).stocks;
+    try{meta=await (await fetch("data/meta.json",{cache:"no-cache"})).json()}catch(e){}
+  }catch(e){
+    sample=true;
+    for(const s in SAMPLE.px)store[s]=SAMPLE.dates.map((d,i)=>[d,SAMPLE.px[s][i]]);
+    LIST=Object.keys(SAMPLE.px).map(s=>{const p=SAMPLE.px[s],A=align([s],1),S=stats(A.px[0],A.ret[0],A.dates);
+      return {sym:s,name:SAMPLE.names[s],ind:SAMPLE.inds[s],last:p.at(-1),date:SAMPLE.dates.at(-1),chg:p.at(-1)/p.at(-2)-1,m:{1:[S.ar,S.ak,S.pr,S.cagr]}}});
+  }
+  STOCKS=Object.fromEntries(LIST.map(x=>[x.sym,x]));
+  status();route();
+}
+const inflight={};
+function ensure(sym){
+  if(store[sym])return Promise.resolve();
+  if(!STOCKS[sym])return Promise.reject(new Error(sym+" is not in the stock list. Remove it and pick from the list."));
+  return inflight[sym]??=fetch("data/"+encodeURIComponent(STOCKS[sym].file)+".json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw new Error(sym+": price file missing");return r.json()})
+    .then(j=>{store[sym]=j.d.map((d,i)=>[d,Number(j.c[i])]).filter(x=>x[1]>0)}).finally(()=>delete inflight[sym]);
+}
+const adjusted=e=>e;
+
+/* ---------- maths ---------- */
+const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
+function cov(a,b){const ma=mean(a),mb=mean(b);let s=0;for(let i=0;i<a.length;i++)s+=(a[i]-ma)*(b[i]-mb);return s/(a.length-1)}
+function align(syms,y){
+  const ser=syms.map(s=>adjusted(store[s])),maps=ser.map(r=>new Map(r));
+  const end=ser.map(r=>r.at(-1)[0]).reduce((a,b)=>a<b?a:b),start=subYears(end,y);
+  const dates=ser[0].map(r=>r[0]).filter(d=>d>=start&&d<=end&&maps.every(m=>m.has(d)));
+  const px=maps.map(m=>dates.map(d=>m.get(d)));
+  return {dates,px,ret:px.map(p=>p.slice(1).map((v,i)=>v/p[i]-1)),start,end,short:dates.length>1&&dates[0]>addDays(start,10)};
+}
+function stats(p,r,dates){
+  const m=mean(r),v=cov(r,r),sd=Math.sqrt(v),days=(Date.parse(dates.at(-1))-Date.parse(dates[0]))/864e5;
+  let peak=p[0],mdd=0;for(const x of p){if(x>peak)peak=x;mdd=Math.min(mdd,x/peak-1)}
+  let best=-1,worst=1,bi=0,wi=0;r.forEach((x,i)=>{if(x>best){best=x;bi=i}if(x<worst){worst=x;wi=i}});
+  return {first:p[0],last:p.at(-1),pr:p.at(-1)/p[0]-1,cagr:Math.pow(p.at(-1)/p[0],365.25/days)-1,m,v,sd,ar:m*TD,ak:sd*Math.sqrt(TD),best,worst,bd:dates[bi+1],wd:dates[wi+1],up:r.filter(x=>x>0).length,down:r.filter(x=>x<0).length,n:r.length,mdd,years:days/365.25};
+}
+function portfolio(A,w){
+  const k=w.length,S=A.ret.map((r,i)=>stats(A.px[i],r,A.dates));
+  const C=A.ret.map(a=>A.ret.map(b=>cov(a,b)));
+  let v=0,diag=0;const mc=w.map((_,i)=>w.reduce((s,wj,j)=>s+wj*C[i][j],0));
+  for(let i=0;i<k;i++){v+=w[i]*mc[i];diag+=w[i]*w[i]*C[i][i]}
+  const ret=w.reduce((s,x,i)=>s+x*S[i].ar,0),risk=Math.sqrt(v*TD),wavg=w.reduce((s,x,i)=>s+x*S[i].ak,0);
+  return {S,C,corr:C.map((r,i)=>r.map((c,j)=>c/Math.sqrt(C[i][i]*C[j][j]))),ret,risk,v:v*TD,diag:diag*TD,covp:(v-diag)*TD,wavg,contrib:w.map((x,i)=>x*mc[i]/v)};
+}
+
+/* ---------- charts ---------- */
+function axes(W,H,m,x0,x1,y0,y1,fx,fy){
+  const X=v=>m.l+(v-x0)/(x1-x0)*(W-m.l-m.r),Y=v=>H-m.b-(v-y0)/(y1-y0)*(H-m.t-m.b);
+  const ticks=(a,b,n)=>{const st=Math.pow(10,Math.floor(Math.log10((b-a)/n)));const s=[1,2,2.5,5,10].map(z=>z*st).find(z=>(b-a)/z<=n);const out=[];for(let v=Math.ceil(a/s)*s;v<=b+1e-12;v+=s)out.push(v);return out};
+  const nt=W<520?3:6;let g="";
+  for(const t of ticks(y0,y1,5))g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--rule)"/><text x="${m.l-8}" y="${Y(t)+4}" text-anchor="end">${fy(t)}</text>`;
+  for(const t of ticks(x0,x1,nt))g+=`<text x="${X(t)}" y="${H-m.b+18}" text-anchor="middle">${fx(t)}</text>`;
+  return {X,Y,g};
+}
+const pad=(a,b,f=.12)=>{const d=(b-a)||Math.abs(a)||.01;return [a-d*f,b+d*f]};
+function draw(el,fn){const s=el.querySelector("svg");const go=()=>{if(s.clientWidth)s.innerHTML=fn(s.clientWidth,s.clientHeight)};go();const ro=new ResizeObserver(go);ro.observe(s)}
+function scatter(W,H,pts,curve){
+  const m={l:56,r:24,t:18,b:42},all=[...pts,...(curve||[])];
+  let [x0,x1]=pad(Math.min(...all.map(p=>p.x)),Math.max(...all.map(p=>p.x)));x0=Math.max(0,x0);
+  let [y0,y1]=pad(Math.min(0,...all.map(p=>p.y)),Math.max(0,...all.map(p=>p.y)));
+  const a=axes(W,H,m,x0,x1,y0,y1,t=>pct(t,0),t=>pct(t,0));let g=a.g;
+  g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${a.Y(0)}" y2="${a.Y(0)}" stroke="var(--mute)"/>`;
+  g+=`<text x="${W-m.r}" y="${H-6}" text-anchor="end">Risk (annual SD) →</text><text x="${m.l}" y="12">↑ Annual return</text>`;
+  if(curve)g+=`<polyline fill="none" stroke="var(--teal)" stroke-width="2.5" stroke-opacity=".45" points="${curve.map(p=>a.X(p.x)+","+a.Y(p.y)).join(" ")}"/>`;
+  for(const p of pts){const X=a.X(p.x),Y=a.Y(p.y),left=X>W*.7;
+    g+=p.main?`<circle class="ring" cx="${X}" cy="${Y}" r="11" fill="var(--teal)" fill-opacity=".18" stroke="var(--teal)" stroke-width="3"/>`
+      :`<circle cx="${X}" cy="${Y}" r="${p.small?4:6}" fill="${p.min?"var(--bg)":"var(--ink)"}" stroke="var(--ink)" stroke-width="${p.min?2:0}"/>`;
+    if(p.label)g+=`<text class="lbl" x="${left?X-14:X+14}" y="${Y+4}" text-anchor="${left?"end":"start"}">${esc(p.label)}</text>`}
+  return g;
+}
+function lineChart(W,H,dates,p){
+  const m={l:62,r:18,t:16,b:34},[y0,y1]=pad(Math.min(...p),Math.max(...p),.06),n=p.length-1;
+  const X=i=>m.l+i/n*(W-m.l-m.r),Y=v=>H-m.b-(v-y0)/(y1-y0)*(H-m.t-m.b);
+  let g="";const st=(y1-y0)/4;for(let k=0;k<=4;k++){const v=y0+st*k;g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--rule)"/><text x="${m.l-8}" y="${Y(v)+4}" text-anchor="end">${num(v,0)}</text>`}
+  const nt=W<520?3:5;for(let k=0;k<nt;k++){const i=Math.round(k/(nt-1)*n);g+=`<text x="${X(i)}" y="${H-10}" text-anchor="${k===0?"start":k===nt-1?"end":"middle"}">${fmtD(dates[i]).slice(3)}</text>`}
+  const pts=p.map((v,i)=>X(i)+","+Y(v)).join(" ");
+  g+=`<polygon points="${m.l},${H-m.b} ${pts} ${X(n)},${H-m.b}" fill="var(--tealbg)"/><polyline points="${pts}" fill="none" stroke="var(--teal)" stroke-width="2"/>`;
+  g+=`<circle cx="${X(n)}" cy="${Y(p[n])}" r="5" fill="var(--teal)"/><text class="lbl" x="${X(n)-8}" y="${Y(p[n])-10}" text-anchor="end">₹${num(p[n])}</text>`;
+  return g;
+}
+
+
+
+/* ---------- picker ---------- */
+let pickCb=null;
+function pick(title,cb,taken){
+  pickCb=cb;$("#ptitle").textContent=title;$("#pq").value="";drawList(taken||[]);
+  const d=$("#pick");d.dataset.taken=JSON.stringify(taken||[]);
+  if(typeof d.showModal==="function")d.showModal();else d.setAttribute("open","");
+  setTimeout(()=>$("#pq").focus(),50);
+}
+function drawList(taken){
+  const q=$("#pq").value.trim().toLowerCase();
+  const rows=LIST.filter(x=>!q||x.sym.toLowerCase().includes(q)||x.name.toLowerCase().includes(q));
+  $("#plist").innerHTML=rows.length?rows.map(x=>`<button type="button" data-s="${esc(x.sym)}" ${taken.includes(x.sym)?"disabled":""}><span><b>${esc(x.sym)}</b>${esc(x.name)}</span><span class="px">₹${num(x.last)}<br><span class="${cls(x.chg||0)}">${x.chg==null?"":pct(x.chg,1)}</span></span></button>`).join("")
+    :`<p class="note" style="padding:12px">No stock matches “${esc(q)}”.</p>`;
+}
+$("#pq").addEventListener("input",()=>drawList(JSON.parse($("#pick").dataset.taken||"[]")));
+$("#plist").addEventListener("click",ev=>{const b=ev.target.closest("button[data-s]");if(!b)return;closePick();if(pickCb)pickCb(b.dataset.s)});
+const closePick=()=>{const d=$("#pick");if(typeof d.close==="function"&&d.open)d.close();else d.removeAttribute("open")};
+$("#pclose").onclick=closePick;
+const pickLabel=(el,s)=>{el.innerHTML=`<span>${esc(s)}<small>${esc(nm(s))}</small></span>`};
+
+/* ---------- views ---------- */
+function status(){
+  const s=$("#status");
+  if(sample){s.innerHTML="<b>Sample data</b> · TCS, INFY, HDFCBANK to 23 Nov 2026";return}
+  const last=LIST.map(x=>x.date).sort().at(-1);
+  const nse=meta&&meta.nse_date?` · official NSE close for ${esc(fmtD(meta.nse_date))}`:"";
+  s.innerHTML=`<b>${LIST.length} NSE stocks</b> · prices to ${esc(fmtD(last))}${nse} · updated every weekday evening`;
+}
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem("rrlab:state",JSON.stringify(state))}catch(e){}},400)}
+function needs(syms,box,go){
+  const t=++token;
+  box.innerHTML=`<p class="load">Loading prices for ${esc(syms.join(", "))}…</p>`;
+  Promise.allSettled(syms.map(ensure)).then(res=>{
+    if(t!==token)return;
+    const bad=res.map((r,i)=>r.status==="rejected"?(r.reason&&r.reason.message||syms[i]+": failed"):null).filter(Boolean);
+    const ok=syms.filter((s,i)=>res[i].status==="fulfilled"&&store[s]&&store[s].length>1);
+    try{go(ok,bad)}catch(err){box.innerHTML=`<p class="err">${esc(err.message)}</p>`}
+  });
+}
+const shortNote=A=>A.short?`<p class="note">Only ${((A.dates.length-1)/TD).toFixed(1)} years of shared data are available, so this uses ${fmtD(A.dates[0])} to ${fmtD(A.dates.at(-1))}.</p>`:"";
+const errs=bad=>bad.length?`<p class="err">${bad.map(esc).join("<br>")}</p>`:"";
+const banner=()=>sample?`<p class="banner">Showing saved sample data. The full stock list loads when the site runs from GitHub Pages.</p>`:"";
+
+function viewPortfolio(){
+  document.getElementsByName("mode").forEach(r=>{r.checked=r.value===state.mode;r.onchange=()=>{state.mode=r.value;save();renderPortfolio()}});
+  $("#addBtn").onclick=()=>pick("Add a stock",s=>{state.holdings.push({sym:s,qty:10,buy:0,wt:10});save();renderPortfolio()},state.holdings.map(h=>h.sym));
+  renderPortfolio();
+}
+function renderPortfolio(){
+  const H=state.holdings,q=state.mode==="qty";
+  const last=s=>store[s]?store[s].at(-1)[1]:(STOCKS[s]?STOCKS[s].last:NaN);
+  const val=H.map(h=>STOCKS[h.sym]?(q?h.qty*last(h.sym):Math.max(0,+h.wt||0)):0),tot=val.reduce((a,b)=>a+(Number.isFinite(b)?b:0),0);
+  $("#hold").innerHTML=H.map((h,i)=>`<div class="h"><div class="hh"><b>${esc(h.sym)}</b><span class="nm">${esc(nm(h.sym))}</span><button class="rm" data-del="${i}" aria-label="Remove ${esc(h.sym)}">Remove</button></div>
+    ${STOCKS[h.sym]?`<div class="hf">${q?`<label>Quantity<input data-i="${i}" data-k="qty" inputmode="decimal" value="${esc(h.qty)}"></label><label>Buy price ₹<input data-i="${i}" data-k="buy" inputmode="decimal" value="${esc(h.buy||"")}" placeholder="optional"></label><span class="kv">Last ₹<b>${num(last(h.sym))}</b></span><span class="kv">Value ₹<b>${num(val[i],0)}</b></span>`
+      :`<label>Weight %<input data-i="${i}" data-k="wt" inputmode="decimal" value="${esc(h.wt??10)}"></label>`}<span class="kv">Share<b>${pct(val[i]/tot,1)}</b></span></div>`
+      :`<p class="warn">Not in the stock list. Remove it and add it again from the list.</p>`}</div>`).join("")||`<p class="note">No stocks yet. Tap “Add a stock”.</p>`;
+  if(q&&H.length)$("#hold").insertAdjacentHTML("beforeend",`<p class="note" style="margin:0 0 10px">Total value <b>₹${num(tot,0)}</b></p>`);
+  $("#hold").querySelectorAll("input").forEach(inp=>inp.onchange=()=>{const h=H[+inp.dataset.i];h[inp.dataset.k]=Math.max(0,parseFloat(inp.value)||0);save();renderPortfolio()});
+  $("#hold").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{H.splice(+b.dataset.del,1);save();renderPortfolio()});
+  const syms=H.map(h=>h.sym).filter(s=>STOCKS[s]);
+  if(!syms.length){$("#pres").innerHTML=banner()+`<p class="load">Add stocks to see your portfolio's risk and return.</p>`;$("#pdetail").innerHTML="";return}
+  needs(syms,$("#pres"),(ok,bad)=>{
+    if(!ok.length){$("#pres").innerHTML=errs(bad);$("#pdetail").innerHTML="";return}
+    const use=H.filter(h=>ok.includes(h.sym)),A=align(use.map(h=>h.sym),state.period);
+    if(A.dates.length<21){$("#pres").innerHTML=errs(bad)+`<p class="err">Not enough shared trading days for these stocks.</p>`;$("#pdetail").innerHTML="";return}
+    const lp=A.px.map(p=>p.at(-1)),v=use.map((h,i)=>q?h.qty*lp[i]:Math.max(0,+h.wt||0)),t=v.reduce((a,b)=>a+b,0);
+    if(!(t>0)){$("#pres").innerHTML=`<p class="load">Enter a quantity or weight above zero.</p>`;$("#pdetail").innerHTML="";return}
+    const w=v.map(x=>x/t),P=portfolio(A,w);
+    const inv=q?use.reduce((s,h)=>s+(h.buy>0?h.qty*h.buy:0),0):0,cur=q?use.reduce((s,h,i)=>s+(h.buy>0?h.qty*lp[i]:0),0):0;
+    $("#pres").innerHTML=banner()+errs(bad)+`<div class="figs">
+      <div class="fig1"><div class="lab">Portfolio risk a year</div><div class="big">${pct(P.risk,1)}</div></div>
+      <div class="fig1"><div class="lab">Portfolio return a year</div><div class="big ${cls(P.ret)}">${pct(P.ret,1)}</div></div>
+      <div class="fig1"><div class="lab">Risk cut by mixing</div><div class="mid">${pct(P.wavg-P.risk,1)}</div><div class="lab">from ${pct(P.wavg,1)}</div></div>
+      ${inv>0?`<div class="fig1"><div class="lab">Gain on your cost</div><div class="mid ${cls(cur-inv)}">${rs(cur-inv)}</div><div class="lab">${pct(cur/inv-1,1)} on ₹${num(inv,0)}</div></div>`:""}
+    </div><div class="panel"><div class="fig" id="pfig"><svg role="img" aria-label="Risk versus return of each stock and the portfolio"></svg></div>
+    <p class="note">Each dot is a stock; the ring is your portfolio. Higher is more return, further right is more risk. ${A.dates.length-1} daily returns, ${fmtD(A.dates[0])} to ${fmtD(A.dates.at(-1))}.</p></div>`+shortNote(A);
+    draw($("#pfig"),(W,Hh)=>scatter(W,Hh,[...P.S.map((s,i)=>({x:s.ak,y:s.ar,label:use[i].sym})),{x:P.risk,y:P.ret,label:"Portfolio",main:1}]));
+    const k=use.length,heat=c=>`background:color-mix(in srgb,${c<0?"var(--red)":"var(--teal)"} ${Math.round(Math.abs(c)*70)}%,var(--bg))`;
+    $("#pdetail").innerHTML=healthHTML(use,w,P)+`<section><h2>Each stock</h2><div class="scroll"><table><thead><tr><th>Stock</th><th>Weight</th><th>Return</th><th>Risk</th><th>Risk share</th><th class="hide-s">Price return</th><th class="hide-s">CAGR</th></tr></thead><tbody>${
+      P.S.map((s,i)=>`<tr><td><b>${esc(use[i].sym)}</b></td><td class="n">${pct(w[i],1)}</td><td class="n ${cls(s.ar)}">${pct(s.ar,1)}</td><td class="n">${pct(s.ak,1)}</td><td class="n">${pct(P.contrib[i],1)}</td><td class="n hide-s ${cls(s.pr)}">${pct(s.pr,1)}</td><td class="n hide-s ${cls(s.cagr)}">${pct(s.cagr,1)}</td></tr>`).join("")}</tbody></table></div>
+      <p class="note">Share of risk: how much of the portfolio's risk comes from each stock. Far above its weight means it adds more risk than its size suggests.</p></section>
+      ${k>1?`<section><h2>Correlation</h2><div class="scroll"><table style="width:auto"><thead><tr><th></th>${use.map(h=>`<th>${esc(h.sym)}</th>`).join("")}</tr></thead><tbody>${
+        P.corr.map((r,i)=>`<tr><td><b>${esc(use[i].sym)}</b></td>${r.map((c,j)=>`<td class="n" style="${i===j?"":heat(c)}">${c.toFixed(2)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+        <p class="note">Near +1: they move together. Near 0 or below: they offset each other and lower risk.</p></section>`:""}
+      <details><summary>See the step-by-step calculation</summary><div class="scroll"><table class="steps"><tbody>
+        <tr><td>Return = Σ weight × annual return</td><td class="n">${pct(P.ret,2)}</td></tr>
+        <tr><td>Own-risk part: Σ w² × σ²</td><td class="n">${P.diag.toFixed(4)}</td></tr>
+        <tr><td>Covariance part: 2 × wᵢ × wⱼ × Covᵢⱼ over ${k*(k-1)/2} pairs</td><td class="n">${P.covp.toFixed(4)}</td></tr>
+        <tr><td>Portfolio variance</td><td class="n">${P.v.toFixed(4)}</td></tr>
+        <tr><td><b>Portfolio risk = √variance</b></td><td class="n"><b>${pct(P.risk,2)}</b></td></tr>
+        <tr><td>Weighted average of stock risks (if every ρ were 1)</td><td class="n">${pct(P.wavg,2)}</td></tr>
+      </tbody></table></div></details>`;
+  });
+}
+
+function viewPair(){
+  const upd=()=>{pickLabel($("#pa"),state.pairA);pickLabel($("#pb"),state.pairB);save();renderPair()};
+  $("#pa").onclick=()=>pick("First stock",s=>{state.pairA=s;upd()},[state.pairB]);
+  $("#pb").onclick=()=>pick("Second stock",s=>{state.pairB=s;upd()},[state.pairA]);
+  $("#pw").value=state.pairW;$("#pw").oninput=()=>{state.pairW=+$("#pw").value;save();renderPair(true)};
+  pickLabel($("#pa"),state.pairA);pickLabel($("#pb"),state.pairB);renderPair();
+}
+let pairCache=null;
+function renderPair(fast){
+  const a=state.pairA,b=state.pairB,wa=state.pairW/100;
+  $("#pwl").textContent=`Mix: ${state.pairW}% ${a} · ${100-state.pairW}% ${b}`;
+  const go=(ok,bad)=>{
+    if(ok.length<2){$("#pairres").innerHTML=errs(bad);$("#psteps").innerHTML="";return}
+    const A=align([a,b],state.period),P=portfolio(A,[wa,1-wa]),[SA,SB]=P.S,c=P.C[0][1],rho=P.corr[0][1];
+    pairCache={key:a+b+state.period};
+    const wmin=Math.min(1,Math.max(0,(P.C[1][1]-c)/(P.C[0][0]+P.C[1][1]-2*c))),at=x=>portfolio(A,[x,1-x]),Pm=at(wmin),curve=[];
+    for(let x=0;x<=1.0001;x+=.02){const z=at(x);curve.push({x:z.risk,y:z.ret})}
+    $("#pairres").innerHTML=banner()+errs(bad)+`<div class="figs">
+      <div class="fig1"><div class="lab">Mix risk a year</div><div class="big">${pct(P.risk,1)}</div></div>
+      <div class="fig1"><div class="lab">Mix return a year</div><div class="big ${cls(P.ret)}">${pct(P.ret,1)}</div></div>
+      <div class="fig1"><div class="lab">Correlation ρ</div><div class="mid">${rho.toFixed(2)}</div><div class="lab">${rho>.6?"move strongly together":rho>.3?"move moderately together":rho>-.1?"mostly independent":"tend to offset"}</div></div>
+    </div><div class="panel"><div class="fig" id="pf"><svg role="img" aria-label="Risk and return for every mix of the two stocks"></svg></div>
+    <p class="note">The curve is every mix from 100% ${esc(b)} to 100% ${esc(a)}. The ring is your mix; the hollow dot is the lowest-risk mix: ${pct(wmin,0)} ${esc(a)}, risk ${pct(Pm.risk,1)}.</p></div>`+shortNote(A);
+    draw($("#pf"),(W,H)=>scatter(W,H,[{x:SA.ak,y:SA.ar,label:a},{x:SB.ak,y:SB.ar,label:b},{x:Pm.risk,y:Pm.ret,min:1,small:1},{x:P.risk,y:P.ret,label:"Your mix",main:1}],curve));
+    $("#psteps").innerHTML=`<details><summary>See the step-by-step calculation</summary><div class="scroll"><table class="steps"><thead><tr><th>Step</th><th>${esc(a)}</th><th>${esc(b)}</th></tr></thead><tbody>
+      <tr><td>Annual return</td><td class="n ${cls(SA.ar)}">${pct(SA.ar)}</td><td class="n ${cls(SB.ar)}">${pct(SB.ar)}</td></tr>
+      <tr><td>Annual risk σ</td><td class="n">${pct(SA.ak)}</td><td class="n">${pct(SB.ak)}</td></tr>
+      <tr><td>Daily variance</td><td class="n">${SA.v.toFixed(6)}</td><td class="n">${SB.v.toFixed(6)}</td></tr>
+      <tr><td>Covariance (daily)</td><td class="n" colspan="2">${c.toFixed(6)}</td></tr>
+      <tr><td>Term 1: wA² × σA²</td><td class="n" colspan="2">${(wa*wa*SA.ak*SA.ak).toFixed(4)}</td></tr>
+      <tr><td>Term 2: wB² × σB²</td><td class="n" colspan="2">${((1-wa)**2*SB.ak*SB.ak).toFixed(4)}</td></tr>
+      <tr><td>Term 3: 2·wA·wB·ρ·σA·σB</td><td class="n" colspan="2">${(2*wa*(1-wa)*rho*SA.ak*SB.ak).toFixed(4)}</td></tr>
+      <tr><td><b>Risk = √(sum)</b></td><td class="n" colspan="2"><b>${pct(P.risk)}</b></td></tr>
+      <tr><td>Risk cut by mixing</td><td class="n" colspan="2">${pct(P.wavg-P.risk)}</td></tr>
+    </tbody></table></div></details>`;
+  };
+  if(fast&&pairCache&&pairCache.key===a+b+state.period&&store[a]&&store[b]){token++;go([a,b],[]);return}
+  needs([a,b],$("#pairres"),go);
+}
+
+function viewSingle(){
+  $("#ss").onclick=()=>pick("Choose a stock",s=>{state.single=s;pickLabel($("#ss"),s);save();renderSingle()});
+  pickLabel($("#ss"),state.single);renderSingle();
+}
+function renderSingle(){
+  const s=state.single;
+  needs([s],$("#sres"),(ok,bad)=>{
+    if(!ok.length){$("#sres").innerHTML=errs(bad);$("#sstats").innerHTML="";return}
+    const A=align([s],state.period),S=stats(A.px[0],A.ret[0],A.dates);
+    $("#sres").innerHTML=banner()+`<div class="figs">
+      <div class="fig1"><div class="lab">Risk a year (SD)</div><div class="big">${pct(S.ak,1)}</div></div>
+      <div class="fig1"><div class="lab">Price return</div><div class="big ${cls(S.pr)}">${pct(S.pr,1)}</div></div>
+      <div class="fig1"><div class="lab">CAGR</div><div class="mid ${cls(S.cagr)}">${pct(S.cagr,1)}</div><div class="lab">per year</div></div>
+    </div><div class="panel"><div class="fig" id="sf"><svg role="img" aria-label="Price history"></svg></div>
+    <p class="note">${esc(nm(s))} · ${fmtD(A.dates[0])} to ${fmtD(A.dates.at(-1))}</p></div>`+shortNote(A);
+    draw($("#sf"),(W,H)=>lineChart(W,H,A.dates,A.px[0]));
+    $("#sstats").innerHTML=`<table class="steps"><tbody>
+      <tr><td>Start → end price</td><td class="n">₹${num(S.first)} → ₹${num(S.last)}</td></tr>
+      <tr><td>Daily returns used</td><td class="n">${S.n}</td></tr>
+      <tr><td>Average daily return</td><td class="n ${cls(S.m)}">${pct(S.m,3)}</td></tr>
+      <tr><td>Daily variance</td><td class="n">${S.v.toFixed(6)}</td></tr>
+      <tr><td>Daily SD (risk)</td><td class="n">${pct(S.sd)}</td></tr>
+      <tr><td>Annual return (× 252)</td><td class="n ${cls(S.ar)}">${pct(S.ar)}</td></tr>
+      <tr><td><b>Annual risk (× √252)</b></td><td class="n"><b>${pct(S.ak)}</b></td></tr>
+      <tr><td>Normal year (±1 SD, about 2 years in 3)</td><td class="n">${pct(S.ar-S.ak,0)} to ${pct(S.ar+S.ak,0)}</td></tr>
+      <tr><td>Best day</td><td class="n pos">${pct(S.best)}<br><span class="note">${fmtD(S.bd)}</span></td></tr>
+      <tr><td>Worst day</td><td class="n neg">${pct(S.worst)}<br><span class="note">${fmtD(S.wd)}</span></td></tr>
+      <tr><td>Days up / down</td><td class="n">${S.up} / ${S.down}</td></tr>
+      <tr><td>Biggest fall from a peak</td><td class="n neg">${pct(S.mdd,1)}</td></tr>
+    </tbody></table>`;
+  });
+}
+function viewLearn(){
+  $("#srcnote").textContent="Prices: "+(meta&&meta.source?meta.source:"daily closing prices for NSE stocks")+". Updated every weekday evening"+(meta&&meta.updated?" (last update "+new Date(meta.updated).toLocaleString("en-IN")+")":"")+". Past risk and return do not predict the future. For learning, not investment advice.";
+}
+
+function toast(msg){const el=$("#toast");el.textContent=msg;el.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove("on"),1800)}
+const sectorOf=s=>(STOCKS[s]&&STOCKS[s].ind)||"Other";
+function healthHTML(use,w,P){
+  const n=use.length,sec={};use.forEach((h,i)=>{const s=sectorOf(h.sym);sec[s]=(sec[s]||0)+w[i]});
+  const secs=Object.entries(sec).sort((a,b)=>b[1]-a[1]),im=w.indexOf(Math.max(...w)),wmax=w[im],smax=secs[0][1];
+  let cs=0,cw=0;for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){cs+=w[i]*w[j]*P.corr[i][j];cw+=w[i]*w[j]}
+  const avgc=cw?cs/cw:1,lin=(x,good,bad)=>Math.max(0,Math.min(10,10*(bad-x)/(bad-good)));
+  const parts=[
+    ["Number of stocks",Math.min(10,n),`${n} stock${n>1?"s":""}. 10 or more gets full marks.`,"Add more stocks: 10 to 20 spread risk well."],
+    ["Biggest holding",lin(wmax,.10,.60),`${use[im].sym} is ${pct(wmax,0)} of your money.`,`${use[im].sym} is ${pct(wmax,0)} of your portfolio. Try to keep one stock under 20%.`],
+    ["Biggest sector",lin(smax,.25,.80),`${secs[0][0]} is ${pct(smax,0)}.`,`${secs[0][0]} is ${pct(smax,0)} of your portfolio. Add stocks from other sectors.`],
+    ["How alike they move",n>1?lin(avgc,.1,.8):0,n>1?`Average correlation ${avgc.toFixed(2)}.`:"Needs two or more stocks.","Your stocks move together a lot. Add stocks with low correlation to the ones you hold."]];
+  const sc=parts.reduce((a,p)=>a+p[1],0)/parts.length,verdict=sc>=7.5?"Well diversified":sc>=5?"Fairly diversified":"Needs more spread";
+  const tips=parts.filter(p=>p[1]<6).map(p=>`<li>${esc(p[3])}</li>`).join("");
+  return `<section style="margin-top:28px"><div class="grid2">
+    <div class="panel"><h2>Portfolio health</h2><div class="score"><span class="big ${sc<5?"neg":"pos"}">${sc.toFixed(1)}</span><span class="mid">/ 10</span></div><p style="margin:2px 0 10px;font-weight:600">${verdict}</p>
+      <div class="bars">${parts.map(p=>`<div><span>${esc(p[0])}</span><span class="meter"><i style="width:${p[1]*10}%;${p[1]<5?"background:var(--red)":""}"></i></span><span class="v">${p[1].toFixed(1)}</span></div>`).join("")}</div>
+      <p class="note">${parts.map(p=>esc(p[2])).join(" ")}</p>${tips?`<ul class="tips">${tips}</ul>`:`<p class="note">No warnings. Your mix is well spread.</p>`}
+      <p class="note">Score = average of the four parts. Each part is 10 when you are well spread and 0 when everything is in one place.</p></div>
+    <div class="panel"><h2>Sectors</h2><div class="bars">${secs.map(([s,v])=>`<div><span>${esc(s)}</span><span class="meter"><i style="width:${v*100}%"></i></span><span class="v">${pct(v,0)}</span></div>`).join("")}</div>
+      <p class="note">Share of your money in each sector${state.mode==="qty"?", at the latest prices":""}.</p></div>
+  </div></section>`;
+}
+function metric(x,y){const m=x.m&&x.m[String(y)];return m?{ar:m[0],ak:m[1],pr:m[2],cagr:m[3],rr:m[1]>0?m[0]/m[1]:NaN}:null}
+function viewHome(){
+  const ups=LIST.filter(x=>x.chg>0).length,downs=LIST.filter(x=>x.chg<0).length,last=LIST.map(x=>x.date).sort().at(-1);
+  $("#hstrip").innerHTML=`<span><b>${LIST.length}</b>NSE stocks</span><span><b>${esc(fmtD(last))}</b>latest prices</span><span><b><span class="pos">${ups}</span> / <span class="neg">${downs}</span></b>up / down that day</span>`;
+  const y=state.period,pts=LIST.map(x=>({x,m:metric(x,y)})).filter(p=>p.m&&Number.isFinite(p.m.ak));
+  $("#htitle").textContent=`${sample?"Sample stocks":"Nifty 500"}: risk vs return, last ${y} year${y>1?"s":""}`;
+  if(!pts.length){$("#hfig").innerHTML=`<p class="load">No data for this period yet.</p>`;return}
+  const lim=(a,q)=>{const s=a.slice().sort((p,r)=>p-r);return s[Math.min(s.length-1,Math.floor(q*(s.length-1)))]};
+  const xs=pts.map(p=>p.m.ak),ys=pts.map(p=>p.m.ar),xmax=lim(xs,.98),ymin=lim(ys,.01),ymax=lim(ys,.99);
+  const shown=pts.filter(p=>p.m.ak<=xmax&&p.m.ar>=ymin&&p.m.ar<=ymax);
+  const best=shown.slice().sort((a,b)=>b.m.rr-a.m.rr)[0],big=shown.slice().sort((a,b)=>b.m.ar-a.m.ar)[0];
+  const med=a=>{const s=a.slice().sort((p,r)=>p-r);return s[Math.floor(s.length/2)]};
+  $("#hnote").textContent=`Each dot is a stock. Middle stock: risk ${pct(med(xs),0)}, return ${pct(med(ys),0)} a year.${pts.length>shown.length?" A few extreme stocks are left off so the rest are readable.":""}`;
+  draw($("#hfig"),(W,H)=>scatter(W,H,shown.map(p=>({x:p.m.ak,y:p.m.ar,small:1,label:(p===best||p===big)?p.x.sym:""}))));
+}
+let scrSort="rr";
+function viewScreen(){
+  const secs=[...new Set(LIST.map(x=>x.ind||"Other"))].sort();
+  $("#ssec").innerHTML=`<option value="">All sectors</option>`+secs.map(s=>`<option>${esc(s)}</option>`).join("");
+  $("#ssort").value=scrSort;
+  ["#sq","#ssec","#ssort"].forEach(id=>$(id).addEventListener("input",drawScreen));
+  $("#stab").addEventListener("click",ev=>{const b=ev.target.closest("[data-add]");if(!b)return;const s=b.dataset.add;
+    if(!state.holdings.some(h=>h.sym===s)){state.holdings.push({sym:s,qty:10,buy:0,wt:10});save()}b.disabled=true;b.textContent="Added";toast(s+" added to your portfolio")});
+  drawScreen();
+}
+function drawScreen(){
+  const q=$("#sq").value.trim().toLowerCase(),sec=$("#ssec").value,y=state.period;scrSort=$("#ssort").value;
+  let rows=LIST.map(x=>({x,m:metric(x,y)})).filter(r=>r.m&&(!sec||(r.x.ind||"Other")===sec)&&(!q||r.x.sym.toLowerCase().includes(q)||r.x.name.toLowerCase().includes(q)));
+  const key={rr:r=>-r.m.rr,ar:r=>-r.m.ar,lowk:r=>r.m.ak,cagr:r=>-r.m.cagr,chg:r=>-(r.x.chg||0)}[scrSort];
+  rows.sort((a,b)=>key(a)-key(b));
+  const held=new Set(state.holdings.map(h=>h.sym));
+  $("#scount").textContent=`${rows.length} stock${rows.length===1?"":"s"} · period ${y} year${y>1?"s":""}`;
+  $("#stab").innerHTML=`<thead><tr><th>Stock</th><th class="hide-s">Sector</th><th class="hide-s">Last ₹</th><th class="hide-s">Today</th><th>Return</th><th>Risk</th><th>Ret / risk</th><th></th></tr></thead><tbody>${
+    rows.slice(0,300).map(({x,m})=>`<tr><td><b>${esc(x.sym)}</b><br><span class="note" style="margin:0">${esc(x.name.length>20?x.name.slice(0,19)+"…":x.name)}</span></td><td class="hide-s">${esc(x.ind||"Other")}</td><td class="n hide-s">${num(x.last)}</td><td class="n hide-s ${cls(x.chg||0)}">${pct(x.chg,1)}</td><td class="n ${cls(m.ar)}">${pct(m.ar,1)}</td><td class="n">${pct(m.ak,1)}</td><td class="n">${Number.isFinite(m.rr)?m.rr.toFixed(2):"–"}</td><td><button class="add" data-add="${esc(x.sym)}" ${held.has(x.sym)?"disabled>Added":">+ Add"}</button></td></tr>`).join("")}</tbody>`;
+  if(rows.length>300)$("#stab").insertAdjacentHTML("beforeend",`<tbody><tr><td colspan="8" class="note">Showing the first 300. Search or pick a sector to narrow the list.</td></tr></tbody>`);
+}
+const views={home:["t-home",viewHome],screen:["t-screen",viewScreen],portfolio:["t-portfolio",viewPortfolio],pair:["t-pair",viewPair],single:["t-single",viewSingle],learn:["t-learn",viewLearn]};
+function route(){
+  const h=location.hash.slice(1),tab=views[h]?h:"home";
+  document.querySelectorAll("#tabs a").forEach(a=>a.toggleAttribute("aria-current",a.getAttribute("href")==="#"+tab));
+  const [tid,fn]=views[tab];$("#main").replaceChildren($("#"+tid).content.cloneNode(true));token++;fn();
+}
+function setPeriod(y){state.period=y;document.querySelectorAll("#period button").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.y===y)))}
+document.querySelectorAll("#period button").forEach(b=>b.onclick=()=>{setPeriod(+b.dataset.y);save();route()});
+window.addEventListener("hashchange",route);
+try{const d=JSON.parse(localStorage.getItem("rrlab:state"));if(d&&Array.isArray(d.holdings)){Object.assign(state,d);setPeriod(+state.period||1)}}catch(e){}
+boot();
+}
+</script>
+</body>
+</html>
