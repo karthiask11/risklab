@@ -24,6 +24,19 @@ OUT = "data"
 PERIOD = "10y"
 BATCH = 40
 EQUITY_URL = "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv"  # every stock listed on NSE
+ETF_URL = "https://nsearchives.nseindia.com/content/equities/eq_etfseclist.csv"  # every ETF listed on NSE
+# REITs and InvITs trade in series RR and IV. Used if NSE's list can't be read.
+TRUSTS = [
+    ("EMBASSY", "Embassy Office Parks REIT", "REIT"),
+    ("MINDSPACE", "Mindspace Business Parks REIT", "REIT"),
+    ("BIRET", "Brookfield India Real Estate Trust", "REIT"),
+    ("NXST", "Nexus Select Trust (REIT)", "REIT"),
+    ("PGINVIT", "POWERGRID Infrastructure Investment Trust", "InvIT"),
+    ("IRBINVIT", "IRB InvIT Fund", "InvIT"),
+    ("INDIGRID", "IndiGrid Infrastructure Trust", "InvIT"),
+]
+KIND = {}  # symbol -> "ETF" / "REIT" / "InvIT"
+JUMP = 0.6  # a one-day fall below 60% (or rise above 1/0.6) of the day before is treated as a corporate action
 N500 = set()  # Nifty 500 symbols, marked "n5" in stocks.json
 LIST_URLS = [
     "https://nsearchives.nseindia.com/content/indices/ind_nifty500list.csv",
@@ -182,13 +195,71 @@ def all_equities():
         r.raise_for_status()
         df = pd.read_csv(io.StringIO(r.text))
         df.columns = [c.strip() for c in df.columns]
-        df = df[df["SERIES"].astype(str).str.strip().isin(["EQ", "BE"])]
-        rows = [(str(s).strip(), str(n).strip(), "") for s, n in zip(df["SYMBOL"], df["NAME OF COMPANY"])]
+        ser = df["SERIES"].astype(str).str.strip()
+        rows = [(str(s).strip(), str(n).strip(), "") for s, n in zip(df[ser.isin(["EQ", "BE"])]["SYMBOL"],
+                                                                     df[ser.isin(["EQ", "BE"])]["NAME OF COMPANY"])]
         print(f"All NSE equities: {len(rows)} stocks")
+        for code, kind in (("RR", "REIT"), ("IV", "InvIT")):
+            part = df[ser == code]
+            for sym, name in zip(part["SYMBOL"], part["NAME OF COMPANY"]):
+                KIND[str(sym).strip()] = kind
+                rows.append((str(sym).strip(), str(name).strip(), kind))
         return rows
     except Exception as e:  # noqa: BLE001
         print(f"Could not read the full NSE list: {e}")
         return []
+
+
+def etfs_and_trusts():
+    """Every ETF on NSE, plus REITs and InvITs (from the built-in list; NSE's equity list adds the rest)."""
+    rows = []
+    for sym, name, kind in TRUSTS:
+        KIND[sym] = kind
+        rows.append((sym, name, kind))
+    try:
+        s = requests.Session()
+        s.headers.update(HEADERS)
+        try:
+            s.get("https://www.nseindia.com", timeout=20)
+        except Exception:  # noqa: BLE001
+            pass
+        r = s.get(ETF_URL, timeout=30)
+        r.raise_for_status()
+        df = pd.read_csv(io.StringIO(r.text))
+        df.columns = [c.strip() for c in df.columns]
+        sc = next(c for c in df.columns if c.lower() == "symbol")
+        nc = next((c for c in df.columns if c.lower().replace(" ", "") in ("securityname", "nameofsecurity")), sc)
+        uc = next((c for c in df.columns if c.lower() == "underlying"), None)
+        for i, row in df.iterrows():
+            sym = str(row[sc]).strip()
+            if not sym or sym == "nan":
+                continue
+            KIND[sym] = "ETF"
+            name = str(row[nc]).strip()
+            if uc and str(row[uc]).strip() not in ("", "nan"):
+                name = f"{name} ({str(row[uc]).strip()})"
+            rows.append((sym, name, "ETF"))
+        print(f"NSE ETFs: {len(df)}")
+    except Exception as e:  # noqa: BLE001
+        print(f"Could not read the NSE ETF list: {e}")
+    return rows
+
+
+def fix_jumps(dates, vals):
+    """Yahoo does not adjust old prices for demergers (e.g. Tata Motors -> TMPV on 14 Oct 2025)
+    and has a few bad prints. NSE price bands make a real one-day move of 40%+ very rare, so when the
+    price falls below 60% (or rises above 1/0.6) of the day before, the older prices are scaled so that
+    day's return is zero. Returns (new values, [[date, factor], ...])."""
+    vals, adj = list(vals), []
+    for i in range(len(vals) - 1, 0, -1):
+        ratio = vals[i] / vals[i - 1]
+        if ratio < JUMP or ratio > 1 / JUMP:
+            for j in range(i):
+                vals[j] = vals[j] * ratio
+            adj.append([dates[i], round(ratio, 4)])
+    if adj:
+        vals = [round(v, 2 if v >= 1 else 4) for v in vals]
+    return vals, adj[::-1]
 
 
 def nse_closes():
@@ -214,7 +285,7 @@ def nse_closes():
                 with zipfile.ZipFile(io.BytesIO(r.content)) as z:
                     df = pd.read_csv(z.open(z.namelist()[0]))
                 df.columns = [c.strip() for c in df.columns]
-                df = df[df["SctySrs"].astype(str).str.strip().isin(["EQ", "BE", "BZ"])]
+                df = df[df["SctySrs"].astype(str).str.strip().isin(["EQ", "BE", "BZ", "RR", "IV"])]
                 out = {str(k).strip(): float(v) for k, v in zip(df["TckrSymb"], df["ClsPric"]) if float(v) > 0}
                 if len(out) > 500:
                     print(f"NSE bhavcopy {d}: {len(out)} closing prices")
@@ -228,7 +299,7 @@ def nse_closes():
             if r.ok and r.text.lstrip().upper().startswith("SYMBOL"):
                 df = pd.read_csv(io.StringIO(r.text))
                 df.columns = [c.strip() for c in df.columns]
-                df = df[df["SERIES"].astype(str).str.strip().isin(["EQ", "BE", "BZ"])]
+                df = df[df["SERIES"].astype(str).str.strip().isin(["EQ", "BE", "BZ", "RR", "IV"])]
                 out = {str(k).strip(): float(v) for k, v in zip(df["SYMBOL"], df["CLOSE_PRICE"]) if float(v) > 0}
                 if len(out) > 500:
                     print(f"NSE full bhavcopy {d}: {len(out)} closing prices")
@@ -293,7 +364,7 @@ def download(tickers):
 def main():
     os.makedirs(OUT, exist_ok=True)
     seen, stocks = set(), []
-    for sym, name, ind in stock_list() + extra_stocks() + all_equities():
+    for sym, name, ind in stock_list() + extra_stocks() + all_equities() + etfs_and_trusts():
         if sym not in seen:
             seen.add(sym)
             stocks.append((sym, name, ind))
@@ -328,19 +399,23 @@ def main():
                         old = json.load(f)
                     if old.get("d"):
                         d2, v2, used = with_nse(sym, old["d"], old["c"], nse_date, nse)
+                        v2, adj = fix_jumps(d2, v2)
                         from_nse += used
-                        if used:
+                        alladj = old.get("adj", []) + adj
+                        if used or adj:
                             with open(path, "w", encoding="utf-8") as f:
-                                json.dump({"s": sym, "d": d2, "c": v2}, f, separators=(",", ":"))
-                        saved.append(entry(sym, name, ind, d2, v2))
+                                json.dump({"s": sym, "d": d2, "c": v2, **({"adj": alladj} if alladj else {})},
+                                          f, separators=(",", ":"))
+                        saved.append(entry(sym, name, ind, d2, v2, alladj))
                 continue
             dates = [d.strftime("%Y-%m-%d") for d in s.index]
             vals = [round(float(v), 2) for v in s.values]
             dates, vals, used = with_nse(sym, dates, vals, nse_date, nse)
+            vals, adj = fix_jumps(dates, vals)
             from_nse += used
             with open(path, "w", encoding="utf-8") as f:
-                json.dump({"s": sym, "d": dates, "c": vals}, f, separators=(",", ":"))
-            saved.append(entry(sym, name, ind, dates, vals))
+                json.dump({"s": sym, "d": dates, "c": vals, **({"adj": adj} if adj else {})}, f, separators=(",", ":"))
+            saved.append(entry(sym, name, ind, dates, vals, adj))
         print(f"{min(i + BATCH, len(stocks))}/{len(stocks)} done")
         time.sleep(3)
 
@@ -355,7 +430,7 @@ def main():
                    "count": len(saved), "failed": failed, "nse_date": nse_date, "nse_count": from_nse,
                    "nifty": nifty,
                    "source": (f"Latest close: NSE bhavcopy {nse_date}. " if nse_date else "")
-                             + "History: Yahoo Finance daily closes, split and bonus adjusted"}, f)
+                             + "History: Yahoo Finance daily closes, split and bonus adjusted; demerger gaps removed"}, f)
     print(f"Saved {len(saved)} stocks ({from_nse} with NSE's official close). Failed: {len(failed)} {failed[:20]}")
 
 
@@ -386,11 +461,12 @@ def metrics(dates, vals):
     return out
 
 
-def entry(sym, name, ind, dates, vals):
+def entry(sym, name, ind, dates, vals, adj=None):
     prev = vals[-2] if len(vals) > 1 else vals[-1]
     return {"sym": sym, "name": name, "ind": ind, "file": file_name(sym),
             "last": vals[-1], "date": dates[-1], "chg": round(vals[-1] / prev - 1, 4),
-            "from": dates[0], "m": metrics(dates, vals), **({"n5": 1} if sym in N500 else {})}
+            "from": dates[0], "m": metrics(dates, vals), **({"n5": 1} if sym in N500 else {}),
+            **({"k": KIND[sym]} if sym in KIND else {}), **({"adj": len(adj)} if adj else {})}
 
 
 if __name__ == "__main__":
