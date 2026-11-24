@@ -23,6 +23,12 @@ h2{font-size:22px;margin-bottom:12px}
 .top{background:var(--band);color:#fff;padding:20px max(5vw,16px) 16px}
 .status{font-size:14px;color:#cfe5e3;margin:6px 0 14px}
 .status b{color:#fff}
+.statusrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 16px}
+.statusrow .status{margin:6px 0 10px}
+.acct{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.acct .who{font-size:14px;color:#e6f2f1;max-width:16em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill{background:#fff;color:#0b5d63;border:0;border-radius:999px;font:600 14px Inter,sans-serif;min-height:38px;padding:0 16px;cursor:pointer}
+.cloudbox{background:var(--bg);border:1px solid var(--rule);border-radius:10px;padding:12px;margin-bottom:12px}
 .bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
 .tabs{display:flex;flex-wrap:wrap;gap:6px}
 .tabs a{color:#fff;text-decoration:none;padding:9px 14px;border-radius:999px;background:rgba(255,255,255,.12);font-weight:600;font-size:15px;white-space:nowrap}
@@ -135,7 +141,7 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
 <body>
 <header class="top">
   <h1>Portfolio Risk Lab</h1>
-  <p class="status" id="status">Loading prices…</p>
+  <div class="statusrow"><p class="status" id="status">Loading prices…</p><div id="acct" class="acct"></div></div>
   <div class="bar">
     <nav class="tabs" id="tabs">
       <a href="#home">Home</a><a href="#portfolio">Portfolio</a><a href="#pair">Two stocks</a><a href="#single">One stock</a><a href="#screen">Screener</a><a href="#learn">Formulas</a>
@@ -149,6 +155,26 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
 <footer>Portfolio Risk Lab · Free and for learning, not investment advice · Prices: NSE bhavcopy (latest close) and Yahoo Finance (history)</footer>
 <div class="toast" id="toast" role="status"></div>
 
+<dialog id="authDlg" aria-labelledby="aT">
+  <div class="dh"><h2 id="aT">Sign in</h2><button class="x" id="aClose" aria-label="Close">×</button></div>
+  <div style="padding:0 16px 18px;display:grid;gap:10px">
+    <p class="note" style="margin:0">Save your portfolios to your account and open them on any device.</p>
+    <button class="btn" id="aGoogle" type="button">Continue with Google</button>
+    <p class="note" style="text-align:center;margin:2px 0">or use your email</p>
+    <input id="aEmail" type="email" autocomplete="email" placeholder="Email">
+    <input id="aPass" type="password" autocomplete="current-password" placeholder="Password (6+ characters)">
+    <div style="display:flex;gap:10px"><button class="btn ghost" id="aIn" type="button" style="flex:1">Sign in</button><button class="btn ghost" id="aNew" type="button" style="flex:1">Create account</button></div>
+    <button class="add" id="aForgot" type="button" style="justify-self:start;border:0;padding:0">Forgot password?</button>
+    <p class="err" id="aErr" role="alert" style="margin:0"></p>
+  </div>
+</dialog>
+<dialog id="nameDlg" aria-labelledby="nTitle">
+  <form id="nForm" style="padding:16px;display:grid;gap:12px">
+    <h2 id="nTitle" style="margin:0;font-size:20px">Name</h2>
+    <input id="nIn" maxlength="80" autocomplete="off">
+    <div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn ghost" id="nCancel" type="button">Cancel</button><button class="btn" type="submit">Save</button></div>
+  </form>
+</dialog>
 <dialog id="pick">
   <div class="dh"><h2 id="ptitle">Choose a stock</h2><button class="x" id="pclose" aria-label="Close">×</button></div>
   <input id="pq" type="search" placeholder="Search name or symbol" autocomplete="off">
@@ -194,7 +220,8 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
     <details><summary>Where do the prices come from?</summary><p>The latest day's price is NSE's official closing price from the NSE bhavcopy (NSE's end-of-day price file). Older daily prices come from Yahoo Finance, adjusted for splits and bonus issues but not dividends. Prices update every weekday evening after NSE publishes its file.</p></details>
     <details><summary>What does "risk" mean here?</summary><p>Risk is the standard deviation of daily returns, turned into a yearly figure (daily SD × √252). It shows how much the return usually swings above or below its average.</p></details>
     <details><summary>Is this investment advice?</summary><p>No. It measures what happened in the past to help you learn and compare. Past risk and return do not predict the future.</p></details>
-    <details><summary>Is my portfolio private?</summary><p>Yes. Your holdings are saved only in the browser you use and are never sent anywhere.</p></details>
+    <details><summary>Is my portfolio private?</summary><p>Yes. Without signing in, holdings stay only in your browser. If you sign in, your portfolios are stored in your own private space in the database; security rules let only you read or change them.</p></details>
+    <details><summary>Can I save more than one portfolio?</summary><p>Yes. Sign in with Google or email, then use New, Save as new, Rename and Delete on the Portfolio page. Your portfolios open on any phone or laptop where you sign in.</p></details>
     <details><summary>Does it cost anything?</summary><p>No. The whole site is free.</p></details>
   </section>
 </template>
@@ -223,13 +250,14 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
   <div class="grid">
     <section class="panel soft">
       <h2>My holdings</h2>
+      <div id="cloud"></div>
       <div class="hf" style="margin:0 0 12px">
         <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="radio" name="mode" value="qty" style="min-height:auto"> By quantity</label>
         <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="radio" name="mode" value="wt" style="min-height:auto"> By weight %</label>
       </div>
       <div id="hold"></div>
       <button class="btn" id="addBtn" type="button" style="width:100%">+ Add a stock</button>
-      <p class="note" id="saved">Your holdings are saved in this browser.</p>
+      <p class="note" id="saved">Your holdings are saved in this browser. Sign in to keep several portfolios on any device.</p>
     </section>
     <section class="result"><div id="pres"></div></section>
   </div>
@@ -299,6 +327,7 @@ const store={};
 const state={period:1,mode:"qty",holdings:[{sym:"TCS",qty:10,buy:3100,wt:30},{sym:"INFY",qty:20,buy:1500,wt:30},{sym:"HDFCBANK",qty:40,buy:950,wt:40}],pairA:"TCS",pairB:"HDFCBANK",pairW:50,single:"TCS",rf:0.065,cap:0.4};
 const IDX="^NIFTY",hasIdx=()=>!!STOCKS[IDX];
 const nm=s=>STOCKS[s]?STOCKS[s].name:s;
+const cleanSym=s=>String(s||"").trim().toUpperCase().replace(/[^A-Z0-9&\-]/g,"").slice(0,20);
 
 /* ---------- data ---------- */
 async function boot(){
@@ -422,7 +451,7 @@ function status(){
   const nse=meta&&meta.nse_date?` · official NSE close for ${esc(fmtD(meta.nse_date))}`:"";
   s.innerHTML=`<b>${LIST.length} NSE stocks</b> · prices to ${esc(fmtD(last))}${nse} · updated every weekday evening`;
 }
-function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem("rrlab:state",JSON.stringify(state))}catch(e){}},400)}
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem("rrlab:state",JSON.stringify(state))}catch(e){}},400);cloudSave()}
 function needs(syms,box,go){
   const t=++token;
   box.innerHTML=`<p class="load">Loading prices for ${esc(syms.join(", "))}…</p>`;
@@ -719,16 +748,95 @@ function drawScreen(){
   if(rows.length>300)$("#stab").insertAdjacentHTML("beforeend",`<tbody><tr><td colspan="9" class="note">Showing the first 300. Search or pick a sector to narrow the list.</td></tr></tbody>`);
 }
 const views={home:["t-home",viewHome],screen:["t-screen",viewScreen],portfolio:["t-portfolio",viewPortfolio],pair:["t-pair",viewPair],single:["t-single",viewSingle],learn:["t-learn",viewLearn]};
+/* ---------- accounts and saved portfolios (Firebase) ---------- */
+const FBCFG={apiKey:"AIzaSyC3ZYgWqcT0-tG7-lSlKzcM-9JEcnhB6OM",authDomain:"risklab---karthi.firebaseapp.com",projectId:"risklab---karthi",storageBucket:"risklab---karthi.firebasestorage.app",messagingSenderId:"78064528496",appId:"1:78064528496:web:8fef81fcb71999471b18b5"};
+let FB=null,user=null,cloud=[],curId=null,cloudT=null,cloudMsg="";
+const onPortfolio=()=>(location.hash.slice(1)||"home")==="portfolio";
+async function fbInit(){
+  try{
+    const B="https://www.gstatic.com/firebasejs/10.12.2/";
+    const [app,A,F]=await Promise.all([import(B+"firebase-app.js"),import(B+"firebase-auth.js"),import(B+"firebase-firestore.js")]);
+    const a=app.initializeApp(FBCFG);FB={A,F,auth:A.getAuth(a),db:F.getFirestore(a)};
+    A.onAuthStateChanged(FB.auth,u=>{user=u;acct();if(u){$("#authDlg").open&&$("#authDlg").close();loadCloud()}else{cloud=[];curId=null;if(onPortfolio())drawCloud()}});
+    acct();
+  }catch(e){FB=null;$("#acct").innerHTML="";console.warn("Sign-in unavailable",e)}
+}
+function acct(){
+  const el=$("#acct");if(!el)return;
+  if(!FB){el.innerHTML="";return}
+  el.innerHTML=user?`<span class="who">${esc((user.displayName||user.email||"Signed in").slice(0,24))}</span><button class="pill" id="outBtn" type="button">Sign out</button>`
+    :`<button class="pill" id="inBtn" type="button">Sign in</button>`;
+  if(user)$("#outBtn").onclick=()=>FB.A.signOut(FB.auth).then(()=>toast("Signed out"));
+  else $("#inBtn").onclick=openAuth;
+  if(onPortfolio())drawCloud();
+}
+function openAuth(){const d=$("#authDlg");$("#aErr").textContent="";if(typeof d.showModal==="function")d.showModal();else d.setAttribute("open","")}
+const authErr=e=>{const c=(e&&e.code)||"";return ({"auth/invalid-credential":"Wrong email or password.","auth/wrong-password":"Wrong email or password.","auth/user-not-found":"No account with this email. Tap Create account.","auth/email-already-in-use":"This email already has an account. Tap Sign in.","auth/weak-password":"Use a password of at least 6 characters.","auth/invalid-email":"That email address doesn't look right.","auth/unauthorized-domain":"This website isn't allowed to sign in yet (Firebase authorized domains).","auth/popup-closed-by-user":"Sign-in window was closed.","auth/network-request-failed":"No internet connection."})[c]||((e&&e.message)||"Something went wrong.")};
+function bindAuth(){
+  $("#aClose").onclick=()=>$("#authDlg").close();
+  $("#aGoogle").onclick=async()=>{const P=new FB.A.GoogleAuthProvider();try{await FB.A.signInWithPopup(FB.auth,P)}catch(e){if(["auth/popup-blocked","auth/operation-not-supported-in-this-environment","auth/cancelled-popup-request"].includes(e.code))FB.A.signInWithRedirect(FB.auth,P);else $("#aErr").textContent=authErr(e)}};
+  const em=()=>$("#aEmail").value.trim(),pw=()=>$("#aPass").value;
+  $("#aIn").onclick=()=>FB.A.signInWithEmailAndPassword(FB.auth,em(),pw()).catch(e=>$("#aErr").textContent=authErr(e));
+  $("#aNew").onclick=()=>FB.A.createUserWithEmailAndPassword(FB.auth,em(),pw()).catch(e=>$("#aErr").textContent=authErr(e));
+  $("#aForgot").onclick=()=>{if(!em()){$("#aErr").textContent="Type your email first.";return}FB.A.sendPasswordResetEmail(FB.auth,em()).then(()=>$("#aErr").textContent="Password reset email sent.").catch(e=>$("#aErr").textContent=authErr(e))};
+}
+const pcol=()=>FB.F.collection(FB.db,"users",user.uid,"portfolios");
+const clean=h=>(Array.isArray(h)?h:[]).slice(0,100).map(x=>({sym:cleanSym(x&&x.sym),qty:Math.max(0,+x.qty||0),buy:Math.max(0,+x.buy||0),wt:Math.max(0,+x.wt||0)})).filter(x=>x.sym);
+const payload=()=>({holdings:clean(state.holdings),mode:state.mode==="wt"?"wt":"qty",period:+state.period||1});
+async function loadCloud(pick){
+  try{
+    const F=FB.F,snap=await F.getDocs(F.query(pcol(),F.orderBy("updated","desc")));
+    cloud=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(!cloud.length){const r=await F.addDoc(pcol(),{name:"My portfolio",...payload(),created:F.serverTimestamp(),updated:F.serverTimestamp()});cloud=[{id:r.id,name:"My portfolio",...payload(),updated:null}];cloudMsg="Your current holdings are saved as “My portfolio”."}
+    const c=cloud.find(x=>x.id===pick)||cloud[0];openCloud(c);
+  }catch(e){cloudMsg="Could not load your portfolios: "+authErr(e);if(onPortfolio())drawCloud()}
+}
+function openCloud(c){
+  curId=c.id;state.holdings=clean(c.holdings);state.mode=c.mode==="wt"?"wt":"qty";setPeriod(+c.period||state.period||1);
+  try{localStorage.setItem("rrlab:state",JSON.stringify(state))}catch(e){}
+  if(onPortfolio())route();
+}
+function cloudSave(){
+  if(!(FB&&user&&curId))return;clearTimeout(cloudT);
+  cloudT=setTimeout(async()=>{try{await FB.F.updateDoc(FB.F.doc(pcol(),curId),{...payload(),updated:FB.F.serverTimestamp()});const c=cloud.find(x=>x.id===curId);if(c)Object.assign(c,payload(),{updated:{toDate:()=>new Date()}});cloudMsg="Saved to your account at "+new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})+".";const m=$("#cloudMsg");if(m)m.textContent=cloudMsg}catch(e){cloudMsg="Not saved: "+authErr(e);const m=$("#cloudMsg");if(m)m.textContent=cloudMsg}},800);
+}
+let nameCb=null;
+function askName(title,val,cb){nameCb=cb;$("#nTitle").textContent=title;$("#nIn").value=val||"";const d=$("#nameDlg");d.showModal?d.showModal():d.setAttribute("open","");setTimeout(()=>$("#nIn").select(),50)}
+function bindName(){
+  $("#nForm").onsubmit=ev=>{ev.preventDefault();const v=$("#nIn").value.trim().slice(0,80);if(!v)return;$("#nameDlg").close();if(nameCb)nameCb(v)};
+  $("#nCancel").onclick=()=>$("#nameDlg").close();
+}
+let delArm=0;
+function drawCloud(){
+  const el=$("#cloud");if(!el)return;
+  if(!FB){el.innerHTML="";return}
+  if(!user){el.innerHTML=`<div class="cloudbox"><p style="margin:0 0 8px">Sign in to save several portfolios to your account and open them on any phone or laptop.</p><button class="btn ghost" id="cIn" type="button">Sign in</button></div>`;$("#cIn").onclick=openAuth;return}
+  const fmt=c=>c.updated&&c.updated.toDate?c.updated.toDate().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}):"";
+  el.innerHTML=`<div class="cloudbox"><label for="pfSel" style="font-size:13px;color:var(--mute)">Saved portfolio</label>
+    <select id="pfSel" style="width:100%;margin:2px 0 8px">${cloud.map(c=>`<option value="${esc(c.id)}" ${c.id===curId?"selected":""}>${esc(c.name||"Untitled")}${fmt(c)?" · "+esc(fmt(c)):""}</option>`).join("")}</select>
+    <div style="display:flex;flex-wrap:wrap;gap:8px"><button class="add" id="cNew" type="button">+ New</button><button class="add" id="cCopy" type="button">Save as new</button><button class="add" id="cRen" type="button">Rename</button><button class="add" id="cDel" type="button" style="color:var(--red);border-color:var(--rule)">Delete</button></div>
+    <p class="note" id="cloudMsg" style="margin:8px 0 0">${esc(cloudMsg||"Changes save to your account automatically.")}</p></div>`;
+  const F=FB.F;
+  $("#pfSel").onchange=()=>{const c=cloud.find(x=>x.id===$("#pfSel").value);if(c){cloudMsg="Opened “"+(c.name||"Untitled")+"”.";openCloud(c)}};
+  const create=async(name,data)=>{try{const r=await F.addDoc(pcol(),{name,...data,created:F.serverTimestamp(),updated:F.serverTimestamp()});cloudMsg="Saved “"+name+"”.";await loadCloud(r.id)}catch(e){cloudMsg="Not saved: "+authErr(e);drawCloud()}};
+  $("#cNew").onclick=()=>askName("Name for the new portfolio","Portfolio "+(cloud.length+1),n=>create(n,{holdings:[],mode:"qty",period:+state.period||1}));
+  $("#cCopy").onclick=()=>askName("Save a copy as","Copy of "+((cloud.find(x=>x.id===curId)||{}).name||"portfolio"),n=>create(n,payload()));
+  $("#cRen").onclick=()=>{const c=cloud.find(x=>x.id===curId);if(!c)return;askName("Rename portfolio",c.name,async n=>{try{await F.updateDoc(F.doc(pcol(),c.id),{name:n,updated:F.serverTimestamp()});c.name=n;cloudMsg="Renamed to “"+n+"”.";drawCloud()}catch(e){cloudMsg="Not renamed: "+authErr(e);drawCloud()}})};
+  $("#cDel").onclick=async()=>{const c=cloud.find(x=>x.id===curId);if(!c)return;
+    if(Date.now()-delArm>4000){delArm=Date.now();$("#cDel").textContent="Tap again to delete";cloudMsg="";return}
+    delArm=0;try{await F.deleteDoc(F.doc(pcol(),c.id));cloudMsg="Deleted “"+(c.name||"Untitled")+"”.";curId=null;await loadCloud()}catch(e){cloudMsg="Not deleted: "+authErr(e);drawCloud()}};
+}
 function route(){
   const h=location.hash.slice(1),tab=views[h]?h:"home";
   document.querySelectorAll("#tabs a").forEach(a=>a.toggleAttribute("aria-current",a.getAttribute("href")==="#"+tab));
   const [tid,fn]=views[tab];$("#main").replaceChildren($("#"+tid).content.cloneNode(true));token++;fn();
+  if(tab==="portfolio")drawCloud();
 }
 function setPeriod(y){state.period=y;document.querySelectorAll("#period button").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.y===y)))}
 document.querySelectorAll("#period button").forEach(b=>b.onclick=()=>{setPeriod(+b.dataset.y);save();route()});
 window.addEventListener("hashchange",route);
 try{const d=JSON.parse(localStorage.getItem("rrlab:state"));if(d&&Array.isArray(d.holdings)){Object.assign(state,d);setPeriod(+state.period||1)}}catch(e){}
-boot();
+bindAuth();bindName();boot();fbInit();
 }
 </script>
 </body>
