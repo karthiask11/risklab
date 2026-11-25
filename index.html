@@ -347,7 +347,26 @@ async function boot(){
   STOCKS=Object.fromEntries(LIST.map(x=>[x.sym,x]));
   if(meta&&meta.nifty)STOCKS[IDX]={sym:IDX,name:"Nifty 50",file:"_NIFTY50",ind:"Index",last:meta.nifty.last,date:meta.nifty.date,m:meta.nifty.m};
   status();route();
+  if(!sample){loadLive();setInterval(()=>{if(!document.hidden)loadLive()},5*60*1000)}
 }
+/* prices during market hours (about 15 minutes delayed), from the "live" branch */
+const LIVE_URL="https://raw.githubusercontent.com/karthiask11/risklab/live/live.json";
+let LIVE=null;
+async function loadLive(){
+  try{
+    const r=await fetch(LIVE_URL+"?t="+Math.floor(Date.now()/6e4),{cache:"no-store"});if(!r.ok)return;
+    const L=await r.json(),daily=LIST.map(x=>x.date).sort().at(-1);
+    const fresh=L.d>daily||(L.d===daily&&meta&&meta.updated&&Date.parse(L.t)>Date.parse(meta.updated));
+    if(!fresh||!L.p)return;
+    const first=!LIVE;LIVE=L;
+    for(const [sym,[p,c]] of Object.entries(L.p)){const x=STOCKS[sym];if(x){x.last=p;x.chg=c;x.date=L.d}}
+    if(L.nifty&&STOCKS[IDX]){STOCKS[IDX].last=L.nifty[0];STOCKS[IDX].chg=L.nifty[1]}
+    status();
+    const v=(location.hash||"#home").slice(1);
+    if(v==="home"||v==="screen"||v===""||first&&v==="portfolio")route();
+  }catch(e){}
+}
+const liveAge=()=>LIVE?Math.round((Date.now()-Date.parse(LIVE.t))/6e4):1e9;
 const inflight={};
 function ensure(sym){
   if(store[sym])return Promise.resolve();
@@ -493,6 +512,8 @@ function status(){
   if(sample){s.innerHTML="<b>Sample data</b> · TCS, INFY, HDFCBANK to 23 Nov 2026";return}
   const last=LIST.map(x=>x.date).sort().at(-1);
   const nse=meta&&meta.nse_date?` · official NSE close for ${esc(fmtD(meta.nse_date))}`:"";
+  if(LIVE){const tm=new Date(LIVE.t).toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",timeZone:"Asia/Kolkata"}),nf=LIVE.nifty?` · Nifty 50 ${num(LIVE.nifty[0],0)} <span class="${cls(LIVE.nifty[1])}">${LIVE.nifty[1]>=0?"+":""}${pct(LIVE.nifty[1],2)}</span>`:"";
+    s.innerHTML=`<b>${LIST.length} NSE stocks</b> · <b>market prices at ${esc(tm)}</b> (about 15 min delayed, refresh every 15 min)${nf} · risk and return use daily closes`;return}
   s.innerHTML=`<b>${LIST.length} NSE stocks</b> · prices to ${esc(fmtD(last))}${nse} · updated every weekday evening`;
 }
 function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem("rrlab:state",JSON.stringify(state))}catch(e){}},400);cloudSave()}
@@ -523,7 +544,7 @@ function viewPortfolio(){
 }
 function renderPortfolio(){
   const H=state.holdings,q=state.mode==="qty";
-  const last=s=>store[s]?store[s].at(-1)[1]:(STOCKS[s]?STOCKS[s].last:NaN);
+  const last=s=>LIVE&&LIVE.p[s]?LIVE.p[s][0]:store[s]?store[s].at(-1)[1]:(STOCKS[s]?STOCKS[s].last:NaN);
   const val=H.map(h=>STOCKS[h.sym]?(q?h.qty*last(h.sym):Math.max(0,+h.wt||0)):0),tot=val.reduce((a,b)=>a+(Number.isFinite(b)?b:0),0);
   $("#hold").innerHTML=H.map((h,i)=>`<div class="h"><div class="hh"><b>${esc(h.sym)}</b><span class="nm">${esc(nm(h.sym))}</span><button class="rm" data-del="${i}" aria-label="Remove ${esc(h.sym)}">Remove</button></div>
     ${STOCKS[h.sym]?`<div class="hf">${q?`<label>Quantity<input data-i="${i}" data-k="qty" inputmode="decimal" value="${esc(h.qty)}"></label><label>Buy price ₹<input data-i="${i}" data-k="buy" inputmode="decimal" value="${esc(h.buy||"")}" placeholder="optional"></label><span class="kv">Last ₹<b>${num(last(h.sym))}</b></span><span class="kv">Value ₹<b>${num(val[i],0)}</b></span>`
@@ -800,7 +821,7 @@ function healthHTML(use,w,P){
 function metric(x,y){const m=x.m&&x.m[String(y)];return m?{ar:m[0],ak:m[1],pr:m[2],cagr:m[3],beta:m[4]==null?NaN:m[4],rr:m[1]>0?(m[0]-state.rf)/m[1]:NaN}:null}
 function viewHome(){
   const ups=LIST.filter(x=>x.chg>0).length,downs=LIST.filter(x=>x.chg<0).length,last=LIST.map(x=>x.date).sort().at(-1);
-  $("#hstrip").innerHTML=`<span><b>${LIST.length}</b>NSE stocks</span><span><b>${esc(fmtD(last))}</b>latest prices</span><span><b><span class="pos">${ups}</span> / <span class="neg">${downs}</span></b>up / down that day</span>`;
+  $("#hstrip").innerHTML=`<span><b>${LIST.length}</b>NSE stocks</span><span><b>${esc(fmtD(last))}</b>latest prices</span><span><b><span class="pos">${ups}</span> / <span class="neg">${downs}</span></b>up / down ${LIVE?"today, live":"that day"}</span>`;
   const anyN5=LIST.some(x=>x.n5),y=state.period,pts=LIST.filter(x=>!anyN5||x.n5).map(x=>({x,m:metric(x,y)})).filter(p=>p.m&&Number.isFinite(p.m.ak));
   $("#htitle").textContent=`${sample?"Sample stocks":"Nifty 500"}: risk vs return, last ${y} year${y>1?"s":""}`;
   if(!pts.length){$("#hfig").innerHTML=`<p class="load">No data for this period yet.</p>`;return}

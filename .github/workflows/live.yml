@@ -1,0 +1,37 @@
+name: Live prices (every 15 minutes, market hours)
+on:
+  schedule:
+    - cron: "*/15 3-10 * * 1-5"   # 8:30 am to 4:15 pm India time; live.py runs only 9:14 am to 3:50 pm
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: live
+  cancel-in-progress: true
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: |
+            live.py
+            data/stocks.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install yfinance pandas
+      - run: python live.py
+        env:
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
+      - name: Publish to the live branch (one commit, replaced each time)
+        if: hashFiles('out/live.json') != ''
+        run: |
+          cd out
+          git init -q
+          git checkout -q -b live
+          git add live.json
+          git -c user.name="price-bot" -c user.email="price-bot@users.noreply.github.com" commit -q -m "Live prices"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" live
