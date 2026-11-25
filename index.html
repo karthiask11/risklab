@@ -134,7 +134,7 @@ th.sort{cursor:pointer;color:var(--teal)}
 footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13px;color:var(--mute)}
 @media(max-width:900px){.hero{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:600px){.hide-s{display:none}.bars div{grid-template-columns:minmax(6em,8em) minmax(0,1fr) 3em}}
-@media(max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}.result{order:-1}}
+@media(max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:600px){table{font-size:13px}th,td{padding:6px 4px}.fig{min-height:270px}.tabs a{padding:8px 11px;font-size:14px}}
 @media(prefers-reduced-motion:no-preference){.ring{transition:cx .4s,cy .4s}}
 </style>
@@ -287,10 +287,10 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
       <div style="display:grid;gap:10px"><button class="pickbtn" id="pa"></button><button class="pickbtn" id="pb"></button></div>
       <p style="margin:16px 0 4px;font-size:14px" id="pwl"></p>
       <input type="range" id="pw" min="0" max="100" step="1" aria-label="Weight in the first stock">
-      <div id="psteps"></div>
     </section>
     <section class="result"><div id="pairres"></div></section>
   </div>
+  <div id="psteps" style="margin-top:18px"></div>
 </template>
 
 <template id="t-single">
@@ -298,10 +298,10 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
     <section class="panel soft">
       <h2>Pick a stock</h2>
       <button class="pickbtn" id="ss"></button>
-      <div id="sstats" style="margin-top:14px"></div>
     </section>
     <section class="result"><div id="sres"></div></section>
   </div>
+  <div id="sstats" style="margin-top:18px;max-width:760px"></div>
 </template>
 
 <template id="t-perf">
