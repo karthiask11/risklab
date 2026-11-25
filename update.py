@@ -424,6 +424,44 @@ def total_return(dates, vals, dv):
     return [x * k for x in tr]
 
 
+def tri_from_etf(nd, nv, ed, ev):
+    """Nifty 50 TRI estimate: daily moves of the Nifty 50 price index (accurate volatility and beta)
+    plus each calendar year's dividend gap, measured as NIFTYBEES's yearly return minus the index's
+    (kept between 0% and 3%). The ETF price alone is noisier, so it is used only for the yearly gap."""
+    def year_end(d, v):
+        out = {}
+        for x, y in zip(d, v):
+            out[x[:4]] = y
+        return out
+    pe, ee = year_end(nd, nv), year_end(ed, ev)
+    years = sorted(set(pe) & set(ee))
+    gap, prev = {}, None
+    for y in years:
+        if prev and prev in pe and prev in ee:
+            gap[y] = min(0.03, max(0.0, (ee[y] / ee[prev]) - (pe[y] / pe[prev])))
+        prev = y
+    last_full = [y for y in sorted(gap) if y < nd[-1][:4]]
+    default = gap[last_full[-1]] if last_full else 0.012
+    if nd[-1][:4] in gap and len([d for d in nd if d[:4] == nd[-1][:4]]) < 200:
+        gap[nd[-1][:4]] = default
+    count = {}
+    for d in nd:
+        count[d[:4]] = count.get(d[:4], 0) + 1
+    start = max(nd[0], ed[0])
+    td, tv, level = [], [], None
+    for i, d in enumerate(nd):
+        if d < start:
+            continue
+        if level is None:
+            level = nv[i]
+        else:
+            g = gap.get(d[:4], default)
+            level *= (nv[i] / nv[i - 1]) * (1 + g) ** (1 / max(200, count[d[:4]]))
+        td.append(d)
+        tv.append(round(level, 2))
+    return td, tv
+
+
 def nifty_tri(price_dates, price_vals):
     """Nifty 50 Total Return Index from niftyindices.com, filled to the latest day with price-index moves."""
     try:
@@ -509,12 +547,8 @@ def main():
                     ev = [float(v) for v in es.values]
                     ed, ev = drop_holidays(ed, ev)
                     ev, _, _ = fix_jumps(ed, ev)
-                    pv = dict(zip(nd, nv))
-                    base = next(d for d in ed if d in pv)
-                    k = pv[base] / ev[ed.index(base)]
-                    td = [d for d in ed if d >= base]
-                    tv = [round(ev[ed.index(d)] * k, 2) for d in td]
-                    src = "NIFTYBEES ETF (tracks Nifty 50 TRI)"
+                    td, tv = tri_from_etf(nd, nv, ed, ev)
+                    src = "Nifty 50 price index + yearly dividend gap from NIFTYBEES"
                     print(f"Nifty 50 TRI from NIFTYBEES: {len(td)} days")
             except Exception as ex:  # noqa: BLE001
                 print(f"NIFTYBEES fallback failed: {ex}")
