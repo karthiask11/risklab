@@ -257,7 +257,7 @@ def drop_holidays(dates, vals):
     return [dates[i] for i in keep], [vals[i] for i in keep]
 
 
-def fix_jumps(dates, vals):
+def fix_jumps(dates, vals, dv=None):
     """Yahoo does not adjust old prices for demergers (e.g. Tata Motors -> TMPV on 14 Oct 2025)
     and has a few bad prints. NSE price bands make a real one-day move of 40%+ very rare, so when the
     price falls below 60% (or rises above 1/0.6) of the day before, the older prices are scaled so that
@@ -268,10 +268,12 @@ def fix_jumps(dates, vals):
         if ratio < JUMP or ratio > 1 / JUMP:
             for j in range(i):
                 vals[j] = vals[j] * ratio
+            if dv:
+                dv = [[d, round(a * ratio, 4) if d < dates[i] else a] for d, a in dv]
             adj.append([dates[i], round(ratio, 4)])
     if adj:
         vals = [round(v, 2 if v >= 1 else 4) for v in vals]
-    return vals, adj[::-1]
+    return vals, adj[::-1], dv or []
 
 
 def file_date(df, col, default):
@@ -364,24 +366,110 @@ def extra_stocks():
     return rows
 
 
-def closes(df, ticker):
-    """Pull one ticker's Close column out of a yfinance download."""
+def column(df, ticker, name):
     try:
         if isinstance(df.columns, pd.MultiIndex):
             lv0 = df.columns.get_level_values(0)
-            s = df[ticker]["Close"] if ticker in lv0 else df["Close"][ticker]
+            s = df[ticker][name] if ticker in lv0 else df[name][ticker]
         else:
-            s = df["Close"]
-        s = pd.to_numeric(s, errors="coerce").dropna()
-        return s[s > 0]
+            s = df[name]
+        return pd.to_numeric(s, errors="coerce")
     except Exception:  # noqa: BLE001
         return None
+
+
+def closes(df, ticker):
+    """Pull one ticker's Close column out of a yfinance download."""
+    s = column(df, ticker, "Close")
+    if s is None:
+        return None
+    s = s.dropna()
+    return s[s > 0]
+
+
+def dividends(df, ticker):
+    """Cash dividends per share on their ex-date: [[date, amount], ...] (split adjusted like Close)."""
+    s = column(df, ticker, "Dividends")
+    if s is None:
+        return []
+    s = s.dropna()
+    return [[d.strftime("%Y-%m-%d"), round(float(v), 4)] for d, v in s[s > 0].items()]
+
+
+def traded_value(df, ticker):
+    """Average daily traded value over the last 3 months, in Rs crore (liquidity)."""
+    c, v = column(df, ticker, "Close"), column(df, ticker, "Volume")
+    if c is None or v is None:
+        return None
+    tv = (c * v).dropna().tail(63)
+    return round(float(tv.mean()) / 1e7, 2) if len(tv) > 10 else None
+
+
+def total_return(dates, vals, dv):
+    """Price series with dividends reinvested, scaled so the last value equals the last price."""
+    if not dv:
+        return list(vals)
+    pos = {d: i for i, d in enumerate(dates)}
+    add = [0.0] * len(vals)
+    for d, a in dv:
+        j = pos.get(d)
+        if j is None:  # ex-date on a day without a price: use the next trading day
+            j = next((k for k, x in enumerate(dates) if x > d), None)
+        if j is not None and j > 0:
+            add[j] += a
+    tr = [1.0]
+    for i in range(1, len(vals)):
+        tr.append(tr[-1] * (vals[i] + add[i]) / vals[i - 1])
+    k = vals[-1] / tr[-1]
+    return [x * k for x in tr]
+
+
+def nifty_tri(price_dates, price_vals):
+    """Nifty 50 Total Return Index from niftyindices.com, filled to the latest day with price-index moves."""
+    try:
+        s = requests.Session()
+        s.headers.update({**HEADERS, "Content-Type": "application/json; charset=UTF-8", "Accept": "application/json",
+                          "Origin": "https://www.niftyindices.com", "Referer": "https://www.niftyindices.com/reports/historical-data"})
+        start = dt.date.fromisoformat(price_dates[0])
+        end = dt.date.fromisoformat(price_dates[-1])
+        out = {}
+        a = start
+        while a <= end:
+            b = min(end, a + dt.timedelta(days=360))
+            cinfo = "{'name':'NIFTY 50','startDate':'%s','endDate':'%s','indexName':'NIFTY 50'}" % (a.strftime("%d-%b-%Y"), b.strftime("%d-%b-%Y"))
+            r = s.post("https://www.niftyindices.com/Backpage.aspx/getTotalReturnIndexString", json={"cinfo": cinfo}, timeout=40)
+            r.raise_for_status()
+            rows = json.loads(r.json()["d"])
+            for row in rows:
+                dk = next(k for k in row if "date" in k.lower())
+                vk = next(k for k in row if "total" in k.lower())
+                out[pd.to_datetime(row[dk], dayfirst=True).strftime("%Y-%m-%d")] = float(str(row[vk]).replace(",", ""))
+            a = b + dt.timedelta(days=1)
+            time.sleep(1)
+        if len(out) < 200:
+            raise ValueError(f"only {len(out)} rows")
+        pv = dict(zip(price_dates, price_vals))
+        d = [x for x in price_dates if x >= min(out)]
+        v, last = [], None
+        for x in d:
+            if x in out:
+                last = out[x]
+            elif last is not None and x in pv:  # TRI not published yet: move with the price index
+                prev = d[d.index(x) - 1]
+                last = last * pv[x] / pv[prev]
+            v.append(round(last, 2) if last else None)
+        keep = [(x, y) for x, y in zip(d, v) if y]
+        print(f"Nifty 50 TRI: {len(out)} days from niftyindices")
+        return [x for x, _ in keep], [y for _, y in keep]
+    except Exception as e:  # noqa: BLE001
+        print(f"Nifty 50 TRI not available ({e}); using the price index")
+        return None, None
 
 
 def download(tickers):
     for attempt in range(3):
         try:
-            return yf.download(tickers, period=PERIOD, interval="1d", auto_adjust=False,
+            return yf.download(tickers, period=PERIOD, interval="1d", auto_adjust=False, actions=True,
                                group_by="ticker", threads=True, progress=False)
         except Exception as e:  # noqa: BLE001
             print(f"Download failed (try {attempt + 1}): {e}")
@@ -408,8 +496,14 @@ def main():
         nv = [round(float(v), 2) for v in s.values]
         with open(os.path.join(OUT, "_NIFTY50.json"), "w", encoding="utf-8") as f:
             json.dump({"s": "NIFTY 50", "d": nd, "c": nv}, f, separators=(",", ":"))
-        nifty = {"last": nv[-1], "date": nd[-1], "m": metrics(nd, nv)}
+        nifty = {"last": nv[-1], "date": nd[-1], "m": metrics(nd, nv), "m30": metrics(*cut30(nd, nv))}
         print(f"Nifty 50: {len(nv)} days")
+        td, tv = nifty_tri(nd, nv)
+        if td:
+            with open(os.path.join(OUT, "_NIFTY50TRI.json"), "w", encoding="utf-8") as f:
+                json.dump({"s": "NIFTY 50 TRI", "d": td, "c": tv}, f, separators=(",", ":"))
+            MKT = pd.Series(tv, index=pd.to_datetime(td))
+            nifty.update({"tri": 1, "m": metrics(td, tv), "m30": metrics(*cut30(td, tv))})
     else:
         print("Nifty 50 download failed; beta will be blank")
     saved, failed, from_nse = [], [], 0
@@ -427,24 +521,27 @@ def main():
                         old = json.load(f)
                     if old.get("d"):
                         d2, v2, used = with_nse(sym, old["d"], old["c"], nse_date, nse)
-                        v2, adj = fix_jumps(d2, v2)
+                        dv = old.get("dv", [])
+                        v2, adj, dv = fix_jumps(d2, v2, dv)
                         from_nse += used
                         alladj = old.get("adj", []) + adj
                         if used or adj:
                             with open(path, "w", encoding="utf-8") as f:
-                                json.dump({"s": sym, "d": d2, "c": v2, **({"adj": alladj} if alladj else {})},
-                                          f, separators=(",", ":"))
-                        saved.append(entry(sym, name, ind, d2, v2, alladj))
+                                json.dump({"s": sym, "d": d2, "c": v2, **({"dv": dv} if dv else {}),
+                                           **({"adj": alladj} if alladj else {})}, f, separators=(",", ":"))
+                        saved.append(entry(sym, name, ind, d2, v2, alladj, dv))
                 continue
             dates = [d.strftime("%Y-%m-%d") for d in s.index]
             vals = [round(float(v), 2) for v in s.values]
             dates, vals, used = with_nse(sym, dates, vals, nse_date, nse)
             dates, vals = drop_holidays(dates, vals)
-            vals, adj = fix_jumps(dates, vals)
+            dv = [x for x in dividends(df, t) if x[0] >= dates[0]]
+            vals, adj, dv = fix_jumps(dates, vals, dv)
             from_nse += used
             with open(path, "w", encoding="utf-8") as f:
-                json.dump({"s": sym, "d": dates, "c": vals, **({"adj": adj} if adj else {})}, f, separators=(",", ":"))
-            saved.append(entry(sym, name, ind, dates, vals, adj))
+                json.dump({"s": sym, "d": dates, "c": vals, **({"dv": dv} if dv else {}),
+                           **({"adj": adj} if adj else {})}, f, separators=(",", ":"))
+            saved.append(entry(sym, name, ind, dates, vals, adj, dv, traded_value(df, t)))
         print(f"{min(i + BATCH, len(stocks))}/{len(stocks)} done")
         time.sleep(3)
 
@@ -459,18 +556,28 @@ def main():
                    "count": len(saved), "failed": failed, "nse_date": nse_date, "nse_count": from_nse,
                    "nifty": nifty,
                    "source": (f"Latest close: NSE bhavcopy {nse_date}. " if nse_date else "")
-                             + "History: Yahoo Finance daily closes, split and bonus adjusted; demerger gaps removed"}, f)
+                             + "History: Yahoo Finance daily closes, split and bonus adjusted; demerger gaps removed; dividends added for total return"}, f)
     print(f"Saved {len(saved)} stocks ({from_nse} with NSE's official close). Failed: {len(failed)} {failed[:20]}")
 
 
 MKT = None  # Nifty 50 daily closes (pandas Series), set in main()
 
 
-def metrics(dates, vals):
+def cut30(dates, vals, dv=None):
+    """The same series ending 30 days before its last day (education mode: SEBI 30-day lag)."""
+    lim = (dt.date.fromisoformat(dates[-1]) - dt.timedelta(days=30)).isoformat()
+    n = sum(1 for d in dates if d <= lim)
+    return (dates[:n], vals[:n]) if dv is None else (dates[:n], vals[:n], [x for x in dv if x[0] <= lim])
+
+
+def metrics(dates, vals, dv=None):
     """Annual return, annual risk, price return, CAGR and beta vs Nifty 50 for 1, 3, 5 and 10 years.
     Same formulas as the website: daily returns, mean x 252, sample SD x sqrt(252),
     beta = covariance(stock, Nifty 50) / variance(Nifty 50) on the same days."""
-    s = pd.Series(vals, index=pd.to_datetime(dates))
+    if len(dates) < 30:
+        return {}
+    raw = pd.Series(vals, index=pd.to_datetime(dates))
+    s = pd.Series(total_return(dates, vals, dv), index=pd.to_datetime(dates))  # dividends reinvested
     end, out = s.index[-1], {}
     for y in (1, 3, 5, 10):
         start = end - pd.DateOffset(years=y)
@@ -480,21 +587,24 @@ def metrics(dates, vals):
         r = p.pct_change().dropna()
         days = (p.index[-1] - p.index[0]).days
         growth = p.iloc[-1] / p.iloc[0]
+        rp = raw[raw.index >= start]
         beta = None
         if MKT is not None:
             both = pd.concat([p, MKT[MKT.index >= p.index[0]]], axis=1, join="inner").pct_change().dropna()
             if len(both) > 20 and both.iloc[:, 1].var() > 0:
                 beta = round(float(both.iloc[:, 0].cov(both.iloc[:, 1]) / both.iloc[:, 1].var()), 3)
         out[str(y)] = [round(float(r.mean() * 252), 4), round(float(r.std(ddof=1) * 252 ** 0.5), 4),
-                       round(float(growth - 1), 4), round(float(growth ** (365.25 / days) - 1), 4), beta]
+                       round(float(rp.iloc[-1] / rp.iloc[0] - 1), 4), round(float(growth ** (365.25 / days) - 1), 4), beta]
     return out
 
 
-def entry(sym, name, ind, dates, vals, adj=None):
+def entry(sym, name, ind, dates, vals, adj=None, dv=None, tv=None):
     prev = vals[-2] if len(vals) > 1 else vals[-1]
     return {"sym": sym, "name": name, "ind": ind, "file": file_name(sym),
             "last": vals[-1], "date": dates[-1], "chg": round(vals[-1] / prev - 1, 4),
-            "from": dates[0], "m": metrics(dates, vals), **({"n5": 1} if sym in N500 else {}),
+            "from": dates[0], "m": metrics(dates, vals, dv), "m30": metrics(*cut30(dates, vals, dv or [])),
+            **({"n5": 1} if sym in N500 else {}), **({"tv": tv} if tv is not None else {}),
+            **({"dy": round(sum(a for d, a in dv if d > (dt.date.fromisoformat(dates[-1]) - dt.timedelta(days=365)).isoformat()) / vals[-1], 4)} if dv else {}),
             **({"k": KIND[sym]} if sym in KIND else {}), **({"adj": len(adj)} if adj else {})}
 
 
