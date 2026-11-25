@@ -578,6 +578,23 @@ def main():
             print(f"Index {name}: {len(idv)} days")
         except Exception as e:  # noqa: BLE001
             print(f"Index {name} failed: {e}")
+    ff = fama_french()
+    apt = {}
+    for tk, key, name in APT_FACTORS:  # macro factors for the APT model
+        try:
+            fdf = download([tk])
+            fx = closes(fdf, tk) if fdf is not None else None
+            if fx is None or len(fx) < 250:
+                print(f"Factor {name}: not available")
+                continue
+            fd = [d.strftime("%Y-%m-%d") for d in fx.index]
+            fv = [round(float(v), 4) for v in fx.values]
+            with open(os.path.join(OUT, "_F_" + key + ".json"), "w", encoding="utf-8") as f:
+                json.dump({"s": name, "d": fd, "c": fv}, f, separators=(",", ":"))
+            apt[key] = {"name": name, "file": "_F_" + key}
+            print(f"Factor {name}: {len(fv)} days")
+        except Exception as e:  # noqa: BLE001
+            print(f"Factor {name} failed: {e}")
     saved, failed, from_nse = [], [], 0
     for i in range(0, len(stocks), BATCH):
         part = stocks[i:i + BATCH]
@@ -626,10 +643,65 @@ def main():
     with open(os.path.join(OUT, "meta.json"), "w", encoding="utf-8") as f:
         json.dump({"updated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes"),
                    "count": len(saved), "failed": failed, "nse_date": nse_date, "nse_count": from_nse,
-                   "nifty": nifty, "indices": indices,
+                   "nifty": nifty, "indices": indices, "ff": ff, "apt": apt,
                    "source": (f"Latest close: NSE bhavcopy {nse_date}. " if nse_date else "")
                              + "History: Yahoo Finance daily closes, split and bonus adjusted; demerger gaps removed; dividends added for total return"}, f)
     print(f"Saved {len(saved)} stocks ({from_nse} with NSE's official close). Failed: {len(failed)} {failed[:20]}")
+
+
+APT_FACTORS = [  # (Yahoo ticker, key, name) macro factors for APT
+    ("INR=X", "USDINR", "US dollar in rupees"),
+    ("BZ=F", "BRENT", "Brent crude oil"),
+]
+FF_URL = "https://faculty.iima.ac.in/iffm/Indian-Fama-French-Momentum/DATA/{m}_FourFactors_and_Market_Returns_Daily_SurvivorshipBiasAdjusted.csv"
+
+
+def fama_french():
+    """Indian Fama-French and momentum factors (IIM Ahmedabad data library, daily, survivorship-bias adjusted).
+    Saves data/_FF.json from 2016 and returns long-run yearly premia (since 1993) for the meta file."""
+    today = dt.date.today()
+    for back in range(0, 20):
+        y, m = today.year, today.month - back
+        while m <= 0:
+            y, m = y - 1, m + 12
+        url = FF_URL.format(m=f"{y}-{m:02d}")
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=40)
+            if not r.ok or len(r.text) < 1000:
+                continue
+            df = pd.read_csv(io.StringIO(r.text))
+            df.columns = [c.strip() for c in df.columns]
+            col = lambda *names: next((c for c in df.columns if c.upper().replace(" ", "") in names), None)
+            dcol = next(c for c in df.columns if "date" in c.lower())
+            cm, cs, ch, cw, cr = col("MF", "MKT-RF", "MKTRF", "MARKETEXCESS", "RM-RF"), col("SMB"), col("HML"), col("WML"), col("RF")
+            if not (cm and cs and ch and cr):
+                print(f"Fama-French file has unexpected columns: {list(df.columns)}")
+                return None
+            print(f"Fama-French columns: {list(df.columns)}; first row: {df.iloc[0].tolist()}")
+            dates = pd.to_datetime(df[dcol].astype(str), errors="coerce", dayfirst=False)
+            if dates.isna().mean() > 0.5 or (dates.dropna().dt.year < 1990).any():
+                dates = pd.to_datetime(df[dcol].astype(str), errors="coerce", dayfirst=True)
+            df = df.assign(_d=dates).dropna(subset=["_d"]).sort_values("_d")
+            vals = df[[cm, cs, ch, cr] + ([cw] if cw else [])].astype(float)
+            if vals[cm].abs().median() > 0.05:  # percent → decimal
+                vals = vals / 100.0
+            days_per_year = len(df) / max(1.0, (df["_d"].iloc[-1] - df["_d"].iloc[0]).days / 365.25)
+            prem = {k: round(float(vals[c].mean() * days_per_year), 4) for k, c in (("mkt", cm), ("smb", cs), ("hml", ch), ("wml", cw)) if c}
+            keep = df["_d"] >= "2016-01-01"
+            out = {"d": [d.strftime("%Y-%m-%d") for d in df["_d"][keep]],
+                   "mkt": [round(x, 6) for x in vals[cm][keep]], "smb": [round(x, 6) for x in vals[cs][keep]],
+                   "hml": [round(x, 6) for x in vals[ch][keep]], "rf": [round(x, 7) for x in vals[cr][keep]]}
+            if cw:
+                out["wml"] = [round(x, 6) for x in vals[cw][keep]]
+            with open(os.path.join(OUT, "_FF.json"), "w", encoding="utf-8") as f:
+                json.dump(out, f, separators=(",", ":"))
+            print(f"Fama-French factors: {len(out['d'])} days to {out['d'][-1]} ({y}-{m:02d} release)")
+            return {"file": "_FF", "to": out["d"][-1], "release": f"{y}-{m:02d}", "premia": prem,
+                    "since": df["_d"].iloc[0].strftime("%Y-%m-%d")}
+        except Exception as e:  # noqa: BLE001
+            print(f"Fama-French {y}-{m:02d}: {e}")
+    print("Fama-French factors not available")
+    return None
 
 
 INDICES = [  # (Yahoo ticker, key, name) extra benchmarks
