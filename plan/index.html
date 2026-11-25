@@ -138,6 +138,7 @@ footer{background:var(--soft);line-height:1.6}
 #main{animation:fadein .25s ease}
 @keyframes fadein{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){#main{animation:none}.panel,.road a{transition:none}}
+.newtag{display:inline-block;margin-left:6px;font:600 11px Inter,sans-serif;color:#8a4b00;background:#fff1d6;border:1px solid #f0c36a;border-radius:999px;padding:1px 7px;vertical-align:middle}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22em),1fr));gap:20px;align-items:start}
 .hero{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:28px;align-items:center}
 .hero h2{font-size:clamp(32px,4.4vw,50px);margin-bottom:14px}
@@ -452,6 +453,9 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
     <div class="panel"><h3>VaR and CVaR</h3><p>Sort the period's daily portfolio returns from worst to best. 1-day VaR 95% = the loss at the worst 5% point: on 1 day in 20 you lose at least this much. CVaR 95% = the average of those worst 5% days. Historical method, no bell-curve assumption.</p></div>
     <div class="panel"><h3>Sortino and drawdown</h3><p>Downside deviation = √[Σ min(0, R − risk-free ÷ 252)² ÷ n] × √252. Sortino = (annual return − risk-free) ÷ downside deviation: like Sharpe but only bad swings count. Max drawdown = the biggest fall from a peak to a later low.</p></div>
     <div class="panel"><h3>Stress test and liquidity</h3><p>COVID test: each stock's total return from 19 Feb to 23 Mar 2020, combined with your weights. Liquidity: average close × volume over the last 3 months; under ₹1 crore a day is flagged as hard to trade.</p></div>
+    <div class="panel"><h3>Short history (new listings)</h3><p>The first 10 trading days after listing are left out. With fewer than 500 days of data, risk and beta are blended: used = w × own + (1 − w) × sector median, with w = days ÷ (days + 250). EWMA risk: σ²ₜ = 0.94 × σ²ₜ₋₁ + 0.06 × r²ₜ₋₁ (RiskMetrics), × √252.</p></div>
+    <div class="panel"><h3>Fama-French 3-factor</h3><p>Rᵢ − Rf = α + bₘ(Rₘ − Rf) + bₛ·SMB + bₕ·HML + error, fitted by least squares on daily data, with Indian factors from IIM Ahmedabad. Expected return = Rf + bₘ × market premium + bₛ × SMB premium + bₕ × HML premium.</p></div>
+    <div class="panel"><h3>APT (Arbitrage Pricing Theory)</h3><p>Rᵢ − Rf = α + Σ bₖ·Fₖ + error, with factors: market, government bonds (LTGILTBEES), gold (GOLDBEES), US dollar (USD/INR) and Brent crude. Expected return = Rf + Σ bₖ × premium ₖ (premia for market, bonds and gold; none assumed for dollar and oil).</p></div>
     <div class="panel"><h3>Amount to shares</h3><p>Target money for each stock = amount × weight (equal: amount ÷ number of stocks). Shares = whole number of (target ÷ price). Leftover cash then buys one more share of the stock furthest below its target, while cash allows.</p></div>
     <div class="panel"><h3>Return contribution</h3><p>Contribution of stock i = weight i × its yearly return. The contributions add up to the portfolio's return, so you see which stocks and sectors earned it. Compare with each stock's risk share.</p></div>
     <div class="panel"><h3>Monte Carlo</h3><p>5,000 random futures, year by year: value × e^(m + s·Z), Z a standard normal draw, with s² = ln(1 + σ² ÷ (1 + μ)²) and m = ln(1 + μ) − s² ÷ 2, so the average yearly return is μ and the risk σ. The 10th, 50th and 90th percentiles give the bad, typical and good cases.</p></div>
@@ -487,7 +491,7 @@ const fmtD=s=>new Date(s+"T00:00:00Z").toLocaleDateString("en-GB",{day:"2-digit"
 
 let STOCKS={},LIST=[],meta=null,sample=false,saveT=null,token=0;
 const store={};
-const state={period:1,mode:"qty",holdings:[{sym:"TCS",qty:10,buy:3100,wt:30},{sym:"INFY",qty:20,buy:1500,wt:30},{sym:"HDFCBANK",qty:40,buy:950,wt:40}],pairA:"TCS",pairB:"HDFCBANK",pairW:50,single:"TCS",rf:0.065,cap:0.4,erm:null,edu:false,optmu:"capm",tx:[],txSym:"TCS",ips:null,bench:"^NIFTY",amt:100000,amtHow:"eq",mcY:5,mcMu:"capm"};
+const state={period:1,mode:"qty",holdings:[{sym:"TCS",qty:10,buy:3100,wt:30},{sym:"INFY",qty:20,buy:1500,wt:30},{sym:"HDFCBANK",qty:40,buy:950,wt:40}],pairA:"TCS",pairB:"HDFCBANK",pairW:50,single:"TCS",rf:0.065,cap:0.4,erm:null,edu:false,optmu:"capm",tx:[],txSym:"TCS",ips:null,blend:true,bench:"^NIFTY",amt:100000,amtHow:"eq",mcY:5,mcMu:"capm"};
 let IDX="^NIFTY";const NIFTY="^NIFTY",hasIdx=()=>!!STOCKS[IDX],BN=()=>STOCKS[IDX]?STOCKS[IDX].name:"Nifty 50";
 const nm=s=>STOCKS[s]?STOCKS[s].name:s;
 const cleanSym=s=>String(s||"").trim().toUpperCase().replace(/[^A-Z0-9&\-]/g,"").slice(0,20);
@@ -548,7 +552,9 @@ function totalReturn(a,dv){
 }
 let EDU_CUT=null,FUND={};const fund=s=>FUND[s]||null;const eduCache=new WeakMap();
 /* the series every calculation uses: total return, and in education mode only data older than 30 days */
-const adjusted=e=>{let a=e.tr||e;if(!EDU_CUT)return a;if(!eduCache.has(a))eduCache.set(a,a.filter(x=>x[0]<=EDU_CUT));return eduCache.get(a)};
+/* a new listing's first 10 trading days swing wildly and say little about its normal risk: leave them out */
+const trimIPO=a=>{if(a._ipo)return a._ipo;a._ipo=a.length>60&&a[0][0]>"2016-12-20"?a.slice(10):a;return a._ipo};
+const adjusted=e=>{let a=trimIPO(e.tr||e);if(!EDU_CUT)return a;if(!eduCache.has(a))eduCache.set(a,a.filter(x=>x[0]<=EDU_CUT));return eduCache.get(a)};
 const rawUpto=e=>EDU_CUT?e.filter(x=>x[0]<=EDU_CUT):e;
 
 /* ---------- maths ---------- */
@@ -608,10 +614,11 @@ function portfolio(A,w){
   const O=A.ret.map((a,i)=>A.ret.map((b,j)=>i===j?{n:a.length}:pairCov(a,rd[i],b,rd[j])));
   let R=A.ret.map((_,i)=>A.ret.map((_,j)=>i===j?1:(O[i][j].n>=20&&O[i][j].va>0&&O[i][j].vb>0?O[i][j].c/Math.sqrt(O[i][j].va*O[i][j].vb):0)));
   const mixed=A.pd&&A.late&&A.late.length>0;if(mixed&&k>2)R=fixCorr(R);
-  const C=R.map((r,i)=>r.map((x,j)=>x*Math.sqrt(S[i].v*S[j].v)));
+  const sc=A.scale||R.map(()=>1);  /* scale > 1 or < 1: a short-history stock's risk blended with its sector's */
+  const C=R.map((r,i)=>r.map((x,j)=>x*Math.sqrt(S[i].v*S[j].v)*sc[i]*sc[j]));
   let v=0,diag=0;const mc=w.map((_,i)=>w.reduce((s,wj,j)=>s+wj*C[i][j],0));
   for(let i=0;i<k;i++){v+=w[i]*mc[i];diag+=w[i]*w[i]*C[i][i]}
-  const ret=w.reduce((s,x,i)=>s+x*S[i].ar,0),risk=Math.sqrt(v*TD),wavg=w.reduce((s,x,i)=>s+x*S[i].ak,0);
+  const ret=w.reduce((s,x,i)=>s+x*S[i].ar,0),risk=Math.sqrt(v*TD),wavg=w.reduce((s,x,i)=>s+x*S[i].ak*sc[i],0);
   return {S,C,corr:R,over:O,ret,risk,v:v*TD,diag:diag*TD,covp:(v-diag)*TD,wavg,contrib:w.map((x,i)=>x*mc[i]/v)};
 }
 
@@ -751,7 +758,7 @@ function renderPortfolio(){
   const H=state.holdings,q=state.mode==="qty";
   const last=s=>EDU_CUT?(store[s]?(rawUpto(store[s]).at(-1)||[0,NaN])[1]:NaN):LIVE&&LIVE.p[s]?LIVE.p[s][0]:store[s]?store[s].at(-1)[1]:(STOCKS[s]?STOCKS[s].last:NaN);
   const val=H.map(h=>STOCKS[h.sym]?(q?h.qty*last(h.sym):Math.max(0,+h.wt||0)):0),tot=val.reduce((a,b)=>a+(Number.isFinite(b)?b:0),0);
-  $("#hold").innerHTML=H.map((h,i)=>`<div class="h"><div class="hh"><b>${esc(h.sym)}</b><span class="nm">${esc(nm(h.sym))}</span><button class="rm" data-del="${i}" aria-label="Remove ${esc(h.sym)}">Remove</button></div>
+  $("#hold").innerHTML=H.map((h,i)=>`<div class="h"><div class="hh"><b>${esc(h.sym)}</b>${isNew(h.sym)?`<span class="newtag" title="Listed less than a year ago: less data, estimates are less reliable">New · ${isNew(h.sym)} mo data</span>`:""}<span class="nm">${esc(nm(h.sym))}</span><button class="rm" data-del="${i}" aria-label="Remove ${esc(h.sym)}">Remove</button></div>
     ${STOCKS[h.sym]?`<div class="hf">${q?`<label>Quantity<input data-i="${i}" data-k="qty" inputmode="decimal" value="${esc(h.qty)}"></label><label>Buy price ₹<input data-i="${i}" data-k="buy" inputmode="decimal" value="${esc(h.buy||"")}" placeholder="optional"></label><span class="kv">Last ₹<b>${num(last(h.sym))}</b></span><span class="kv">Value ₹<b>${num(val[i],0)}</b></span>`
       :`<label>Weight %<input data-i="${i}" data-k="wt" inputmode="decimal" value="${esc(h.wt??10)}"></label>`}<span class="kv">Share<b>${pct(val[i]/tot,1)}</b></span></div>`
       :`<p class="warn">Not in the stock list. Remove it and add it again from the list.</p>`}</div>`).join("")||`<p class="note">No stocks yet. Tap “Add a stock”.</p>`;
@@ -772,8 +779,10 @@ function renderPortfolio(){
     const mret=withIdx?AA.ret[k]:null,mrd=withIdx?AA.rd[k]:null,mS=withIdx?stats(AA.px[k],mret,AA.pd[k]):null;
     const lp=A.px.map(p=>p.at(-1)),v=use.map((h,i)=>q?h.qty*lp[i]:Math.max(0,+h.wt||0)),t=v.reduce((a,b)=>a+b,0);
     if(!(t>0)){$("#pres").innerHTML=`<p class="load">Enter a quantity or weight above zero.</p>`;$("#pdetail").innerHTML="";return}
-    const w=v.map(x=>x/t),P=portfolio(A,w),rf=state.rf;
-    const beta=A.ret.map((r,i)=>{if(!mret)return NaN;const o=pairCov(r,A.rd[i],mret,mrd);return o.n>=20?o.c/o.vb:NaN}),pb=w.reduce((s,x,i)=>s+x*beta[i],0),psh=(P.ret-rf)/P.risk;
+    const w=v.map(x=>x/t),rf=state.rf;
+    const beta0=A.ret.map((r,i)=>{if(!mret)return NaN;const o=pairCov(r,A.rd[i],mret,mrd);return o.n>=20?o.c/o.vb:NaN});
+    const P0=portfolio(A,w),SH=shortInfo(use,A,P0,beta0);
+    const P=SH.used?portfolio({...A,scale:SH.scale},w):P0,beta=SH.beta,pb=w.reduce((s,x,i)=>s+x*beta[i],0),psh=(P.ret-rf)/P.risk;
     const inv=q?use.reduce((s,h)=>s+(h.buy>0?h.qty*h.buy:0),0):0,cur=q?use.reduce((s,h,i)=>s+(h.buy>0?h.qty*lp[i]:0),0):0;
     $("#pres").innerHTML=banner()+errs(bad)+`<div class="figs">
       <div class="fig1"><div class="lab">Portfolio risk a year ${tip("risk")}</div><div class="big">${pct(P.risk,1)}</div></div>
@@ -788,7 +797,7 @@ function renderPortfolio(){
     const heat=c=>`background:color-mix(in srgb,${c<0?"var(--red)":"var(--teal)"} ${Math.round(Math.abs(c)*70)}%,var(--bg))`;
     const opt=k>1?optimise(A,P,use,w,beta):null;
     lastExport={A,P,use,w,beta,pb,psh,mS,opt};
-    $("#pdetail").innerHTML=simpleHTML(A,P,use,w,beta,pb,psh,mS,q?t:0)+healthHTML(use,w,P)+allocHTML(use,w,q?t:0)+badDaysHTML(A,w,use,rf,q?t:0,mS)+expHTML(use,w,beta,P,mS,q?t:0)+mcHTML(P,pb,q?t:0)+(opt?opt.html:"")+attribHTML(use,w,P)+`<section><h2>Each stock</h2><div class="scroll"><table><thead><tr><th>Stock</th><th>Weight</th><th>Return</th><th>Risk</th><th>Sharpe</th><th class="hide-s">Beta</th><th>Risk share</th><th class="hide-s">Total return</th><th class="hide-s">CAGR</th></tr></thead><tbody>${
+    $("#pdetail").innerHTML=simpleHTML(A,P,use,w,beta,pb,psh,mS,q?t:0)+shortHTML(SH,use)+healthHTML(use,w,P)+allocHTML(use,w,q?t:0)+badDaysHTML(A,w,use,rf,q?t:0,mS)+expHTML(use,w,beta,P,mS,q?t:0)+mcHTML(P,pb,q?t:0)+(opt?opt.html:"")+attribHTML(use,w,P)+`<div id="models"></div>`+`<section><h2>Each stock</h2><div class="scroll"><table><thead><tr><th>Stock</th><th>Weight</th><th>Return</th><th>Risk</th><th>Sharpe</th><th class="hide-s">Beta</th><th>Risk share</th><th class="hide-s">Total return</th><th class="hide-s">CAGR</th></tr></thead><tbody>${
       P.S.map((s,i)=>`<tr><td><b>${esc(use[i].sym)}</b></td><td class="n">${pct(w[i],1)}</td><td class="n ${cls(s.ar)}">${pct(s.ar,1)}</td><td class="n">${pct(s.ak,1)}</td><td class="n">${fx((s.ar-rf)/s.ak)}</td><td class="n hide-s">${Number.isFinite(beta[i])?beta[i].toFixed(2):"–"}</td><td class="n">${pct(P.contrib[i],1)}</td><td class="n hide-s ${cls(s.pr)}">${pct(s.pr,1)}</td><td class="n hide-s ${cls(s.cagr)}">${pct(s.cagr,1)}</td></tr>`).join("")}
       ${mS?`<tr><td><i>${BN()}</i></td><td></td><td class="n ${cls(mS.ar)}">${pct(mS.ar,1)}</td><td class="n">${pct(mS.ak,1)}</td><td class="n">${fx((mS.ar-rf)/mS.ak)}</td><td class="n hide-s">1.00</td><td></td><td class="n hide-s ${cls(mS.pr)}">${pct(mS.pr,1)}</td><td class="n hide-s ${cls(mS.cagr)}">${pct(mS.cagr,1)}</td></tr>`:""}</tbody></table></div>
       <p class="note">Sharpe = (return − risk-free rate) ÷ risk; higher is better. Beta above 1 moves more than ${BN()}, below 1 moves less. Risk share: how much of the portfolio's risk comes from each stock.</p></section>
@@ -806,7 +815,8 @@ function renderPortfolio(){
         <tr><td>Beta = Σ weight × stock beta</td><td class="n">${Number.isFinite(pb)?pb.toFixed(3):"–"}</td></tr>
       </tbody></table></div></details>
       <p style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost" id="csvBtn" type="button">Download results for Excel (CSV)</button><button class="btn ghost" type="button" onclick="window.print()">Print / save as PDF</button></p>`;
-    if(opt)opt.after();bindExp();bindMC(P,pb,q?t:0);
+    if(opt)opt.after();bindExp();bindMC(P,pb,q?t:0);modelsHTML(A,use,w,beta);
+    $("#pdetail").querySelectorAll("#blendIn").forEach(c=>c.onchange=()=>{state.blend=c.checked;save();renderPortfolio()});
     $("#csvBtn").onclick=downloadCSV;
   });
 }
@@ -851,6 +861,84 @@ function badDaysHTML(A,w,use,rf,val,mS){
   ${thin.length?`<p class="warn">Hard to trade: ${esc(thin.join(", "))} trade${thin.length===1?"s":""} under ₹1 crore a day on average. Large orders can move the price.</p>`:""}</section>`;
 }
 
+
+/* ---------- stocks with a short history: warning, EWMA risk, blend with the sector ---------- */
+function isNew(s){const x=STOCKS[s];if(!x||!x.from||s.startsWith("^"))return 0;const last=LIST.map(y=>y.date).sort().at(-1)||x.date,m=(Date.parse(last)-Date.parse(x.from))/864e5/30.44;return m<12?Math.max(1,Math.round(m)):0}
+function ewmaRisk(r,lam=.94){if(r.length<20)return NaN;let v=r.slice(0,20).reduce((a,x)=>a+x*x,0)/20;for(const x of r)v=lam*v+(1-lam)*x*x;return Math.sqrt(v*TD)}
+function sectorPrior(sym,y){
+  const ind=STOCKS[sym]&&STOCKS[sym].ind,pool=LIST.filter(x=>x.n5&&x.m&&x.m[String(y)]&&x.sym!==sym),same=pool.filter(x=>ind&&x.ind===ind);
+  const use=same.length>=5?same:pool,med=a=>{const b=a.filter(Number.isFinite).sort((p,q)=>p-q);return b.length?b[Math.floor(b.length/2)]:NaN};
+  return {ak:med(use.map(x=>x.m[String(y)][1])),beta:med(use.map(x=>x.m[String(y)][4])),n:use.length,label:same.length>=5?ind:"all Nifty 500 stocks"};
+}
+function shortInfo(use,A,P,beta){
+  const K=250,late=new Set(A.late||[]),rows=use.map((h,i)=>{const n=A.ret[i].length,own=P.S[i].ak,ew=ewmaRisk(A.ret[i]),isShort=late.has(i)&&n<500;
+    if(!isShort||state.blend===false)return {sym:h.sym,n,own,ew,beta:beta[i],uk:own,ub:beta[i],short:isShort};
+    const pr=sectorPrior(h.sym,state.period),cw=n/(n+K);
+    const uk=Number.isFinite(pr.ak)?cw*own+(1-cw)*pr.ak:own,ub=Number.isFinite(beta[i])&&Number.isFinite(pr.beta)?cw*beta[i]+(1-cw)*pr.beta:beta[i];
+    return {sym:h.sym,n,own,ew,beta:beta[i],pr,cw,uk,ub,short:true}});
+  const used=state.blend!==false&&rows.some(r=>r.cw!=null);
+  return {rows,used,scale:rows.map(r=>r.own>0?r.uk/r.own:1),beta:rows.map(r=>r.ub),any:rows.some(r=>r.short)};
+}
+function shortHTML(SH,use){
+  if(!SH.any)return "";
+  return `<section style="margin-top:8px"><h2>Stocks with a short history</h2>
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin-bottom:8px"><input type="checkbox" id="blendIn" ${state.blend!==false?"checked":""} style="min-height:auto"> Blend their risk and beta with their sector (recommended)</label>
+    <div class="scroll"><table><thead><tr><th>Stock</th><th class="n">Days of data</th><th class="n">Own risk</th><th class="n">Recent risk (EWMA)</th><th class="n">Sector risk</th><th class="n">Own beta</th><th class="n">Sector beta</th><th class="n">Weight on own data</th><th class="n">Risk used</th><th class="n">Beta used</th></tr></thead><tbody>
+    ${SH.rows.filter(r=>r.short).map(r=>`<tr><td><b>${esc(r.sym)}</b>${isNew(r.sym)?' <span class="newtag">New</span>':""}</td><td class="n">${r.n}</td><td class="n">${pct(r.own,1)}</td><td class="n">${pct(r.ew,1)}</td><td class="n">${r.pr?pct(r.pr.ak,1):"–"}</td><td class="n">${fx(r.beta)}</td><td class="n">${r.pr?fx(r.pr.beta):"–"}</td><td class="n">${r.cw!=null?pct(r.cw,0):"100%"}</td><td class="n"><b>${pct(r.uk,1)}</b></td><td class="n"><b>${fx(r.ub)}</b></td></tr>`).join("")}</tbody></table></div>
+    <p class="note">Fewer than 2 years of prices make risk and beta unreliable. The site leaves out the first 10 trading days after a listing (the IPO rush), then blends the stock's own numbers with the median of its sector (${SH.rows.filter(r=>r.pr).map(r=>`${esc(r.sym)}: ${esc(r.pr.label)}, ${r.pr.n} stocks`).join("; ")||"Nifty 500"}). Weight on own data = days ÷ (days + 250), so it grows as history builds up. EWMA risk gives recent days more weight (λ = 0.94, RiskMetrics) and shows whether the stock has calmed down or become more volatile lately.</p></section>`;
+}
+/* ---------- return models: CAPM, Fama-French 3-factor, APT ---------- */
+const FILES={};
+function getFile(f){return FILES[f]??=fetch("data/"+f+".json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw 0;return r.json()})}
+function ols(y,X){ // least squares with intercept in X[0]; returns coefficients and R²
+  const k=X[0].length,A=[...Array(k)].map(()=>Array(k+1).fill(0));
+  for(let t=0;t<y.length;t++)for(let i=0;i<k;i++){for(let j=0;j<k;j++)A[i][j]+=X[t][i]*X[t][j];A[i][k]+=X[t][i]*y[t]}
+  for(let c=0;c<k;c++){let p=c;for(let r=c+1;r<k;r++)if(Math.abs(A[r][c])>Math.abs(A[p][c]))p=r;[A[c],A[p]]=[A[p],A[c]];if(Math.abs(A[c][c])<1e-18)return null;
+    for(let r=0;r<k;r++)if(r!==c){const f=A[r][c]/A[c][c];for(let j=c;j<=k;j++)A[r][j]-=f*A[c][j]}}
+  const b=A.map((r,i)=>r[k]/r[i]),my=mean(y);let sse=0,sst=0;
+  for(let t=0;t<y.length;t++){const f=X[t].reduce((a,x,i)=>a+x*b[i],0);sse+=(y[t]-f)**2;sst+=(y[t]-my)**2}
+  return {b,r2:sst>0?1-sse/sst:NaN,n:y.length};
+}
+const levelMap=e=>{const m=new Map(e.d.map((d,i)=>[d,e.c[i]]));return {m,d:e.d,c:e.c}};
+function levelOn(L,d){if(L.m.has(d))return L.m.get(d);let lo=0,hi=L.d.length-1,r=-1;while(lo<=hi){const k=(lo+hi)>>1;if(L.d[k]<=d){r=k;lo=k+1}else hi=k-1}return r>=0?L.c[r]:NaN}
+async function modelsHTML(A,use,w,beta){
+  const box=$("#models");if(!box)return;const ff=meta&&meta.ff,apt=meta&&meta.apt||{};
+  if(!ff&&!Object.keys(apt).length){box.innerHTML="";return}
+  box.innerHTML=`<section style="margin-top:28px"><h2>Return models compared ${tip("models")}</h2><p class="load">Running the factor regressions…</p></section>`;
+  const t0=token;
+  try{
+    const [F,...AP]=await Promise.all([ff?getFile(ff.file).catch(()=>null):null,...["USDINR","BRENT"].map(k=>apt[k]?getFile(apt[k].file).catch(()=>null):null),
+      ...["LTGILTBEES","GOLDBEES"].map(s=>STOCKS[s]?ensure(s).catch(()=>null):null)]);
+    if(t0!==token)return;
+    const rf=state.rf,erm=state.erm??ermDefault(),mkt=STOCKS[IDX]&&store[IDX]?levelMap({d:store[IDX].map(x=>x[0]),c:store[IDX].map(x=>x[1])}):null;
+    const ext=[AP[0]?levelMap(AP[0]):null,AP[1]?levelMap(AP[1]):null,store.LTGILTBEES?levelMap({d:(store.LTGILTBEES.tr||store.LTGILTBEES).map(x=>x[0]),c:(store.LTGILTBEES.tr||store.LTGILTBEES).map(x=>x[1])}):null,store.GOLDBEES?levelMap({d:store.GOLDBEES.map(x=>x[0]),c:store.GOLDBEES.map(x=>x[1])}):null];
+    const ffm=F?new Map(F.d.map((d,i)=>[d,i])):null,P=ff&&ff.premia||{};
+    const gm=x=>STOCKS[x]&&(STOCKS[x].m["10"]||STOCKS[x].m["5"]),giltP=gm("LTGILTBEES")?gm("LTGILTBEES")[3]-rf:0,goldP=gm("GOLDBEES")?Math.min(gm("GOLDBEES")[3],.10)-rf:0;
+    const rows=use.map((h,i)=>{
+      const rd=A.rd[i],r=A.ret[i],capm=rf+beta[i]*(erm-rf);let FFr=null,APr=null;
+      if(F){const y=[],X=[];rd.forEach((d,t)=>{const k=ffm.get(d);if(k!=null){y.push(r[t]-F.rf[k]);X.push([1,F.mkt[k],F.smb[k],F.hml[k]])}});
+        if(y.length>=60){const o=ols(y,X);if(o)FFr={...o,e:rf+o.b[1]*(erm-rf)+o.b[2]*(P.smb||0)+o.b[3]*(P.hml||0)}}}
+      if(mkt&&ext.every(Boolean)){const y=[],X=[];for(let t=1;t<rd.length;t++){const d0=rd[t-1],d1=rd[t],ch=L=>levelOn(L,d1)/levelOn(L,d0)-1;
+          const row=[1,ch(mkt)-rf/TD,ch(ext[2]),ch(ext[3]),ch(ext[0]),ch(ext[1])];if(row.every(Number.isFinite)){y.push(r[t]-rf/TD);X.push(row)}}
+        if(y.length>=60){const o=ols(y,X);if(o)APr={...o,e:rf+o.b[1]*(erm-rf)+o.b[2]*giltP+o.b[3]*goldP}}}
+      return {sym:h.sym,beta:beta[i],capm,FF:FFr,AP:APr,past:P_ret(i)}});
+    function P_ret(i){return A.ret[i].length?mean(A.ret[i])*TD:NaN}
+    const wsum=(f)=>{let s=0,ws=0;rows.forEach((x,i)=>{const v=f(x);if(Number.isFinite(v)){s+=w[i]*v;ws+=w[i]}});return ws>.999?s:NaN};
+    const f2=x=>Number.isFinite(x)?fx(x):"–";
+    box.innerHTML=`<section style="margin-top:28px"><h2>Return models compared ${tip("models")}</h2>
+      <p class="note" style="margin-top:0">Three ways to estimate a fair yearly return from the risks a stock carries. Markowitz (the optimiser above) then uses such estimates to choose weights.</p>
+      <div class="scroll"><table><thead><tr><th>Stock</th><th class="n">Past return</th><th class="n">CAPM β</th><th class="n">CAPM</th><th class="n">FF market</th><th class="n">FF size (SMB)</th><th class="n">FF value (HML)</th><th class="n">FF R²</th><th class="n">Fama-French</th><th class="n">APT R²</th><th class="n">APT</th></tr></thead><tbody>
+      ${rows.map(x=>`<tr><td><b>${esc(x.sym)}</b></td><td class="n ${cls(x.past)}">${pct(x.past,1)}</td><td class="n">${f2(x.beta)}</td><td class="n"><b>${pct(x.capm,1)}</b></td>
+        <td class="n">${x.FF?f2(x.FF.b[1]):"–"}</td><td class="n">${x.FF?f2(x.FF.b[2]):"–"}</td><td class="n">${x.FF?f2(x.FF.b[3]):"–"}</td><td class="n">${x.FF?pct(x.FF.r2,0):"–"}</td><td class="n"><b>${x.FF?pct(x.FF.e,1):"–"}</b></td>
+        <td class="n">${x.AP?pct(x.AP.r2,0):"–"}</td><td class="n"><b>${x.AP?pct(x.AP.e,1):"–"}</b></td></tr>`).join("")}
+      <tr><td><b>Portfolio</b></td><td class="n">${pct(wsum(x=>x.past),1)}</td><td class="n">${f2(wsum(x=>x.beta))}</td><td class="n"><b>${pct(wsum(x=>x.capm),1)}</b></td><td></td><td></td><td></td><td></td><td class="n"><b>${pct(wsum(x=>x.FF?x.FF.e:x.capm),1)}</b></td><td></td><td class="n"><b>${pct(wsum(x=>x.AP?x.AP.e:x.capm),1)}</b></td></tr>
+      </tbody></table></div>
+      ${rows.some(x=>!x.FF||!x.AP)?`<p class="note">${esc(rows.filter(x=>!x.FF||!x.AP).map(x=>x.sym).join(", "))}: too few days overlap with the factor data${ff?` (Fama-French data runs to ${esc(fmtD(ff.to))})`:""}, so the portfolio row uses its CAPM estimate there.</p>`:""}
+      ${rows.some(x=>x.AP)?`<details><summary>APT factor sensitivities</summary><div class="scroll"><table><thead><tr><th>Stock</th><th class="n">Market</th><th class="n">Bonds (gilt)</th><th class="n">Gold</th><th class="n">US dollar</th><th class="n">Crude oil</th><th class="n">Alpha a year</th></tr></thead><tbody>
+        ${rows.filter(x=>x.AP).map(x=>`<tr><td><b>${esc(x.sym)}</b></td>${[1,2,3,4,5].map(k=>`<td class="n">${f2(x.AP.b[k])}</td>`).join("")}<td class="n ${cls(x.AP.b[0])}">${pct(x.AP.b[0]*TD,1)}</td></tr>`).join("")}</tbody></table></div></details>`:""}
+      <p class="note"><b>CAPM:</b> risk-free ${pct(rf,1)} + β × (${pct(erm,1)} − ${pct(rf,1)}). <b>Fama-French 3-factor:</b> regression of the stock's daily excess return on the Indian market, size (SMB: small minus big) and value (HML: high minus low book-to-market) factors from the IIM Ahmedabad data library${ff?` (data to ${esc(fmtD(ff.to))}; long-run premia since ${esc(ff.since.slice(0,4))}: SMB ${pct(P.smb,1)}, HML ${pct(P.hml,1)} a year)`:""}; a positive SMB loading means it behaves like a small company, a positive HML loading like a value stock. <b>APT:</b> regression on five macro factors (market, government bonds, gold, US dollar, crude oil); expected return = risk-free + Σ sensitivity × premium, with premia from the market (${pct(erm-rf,1)}), bonds (${pct(giltP,1)}) and gold (${pct(goldP,1)}); the dollar and oil are treated as risks without a premium. R² = how much of the daily movement the factors explain. Estimates for learning, not forecasts.</p></section>`;
+  }catch(e){box.innerHTML=`<section style="margin-top:28px"><h2>Return models compared</h2><p class="note">Factor data is not available yet (it arrives with the next evening update).</p></section>`}
+}
 /* ---------- your portfolio in simple words (rule-based report) ---------- */
 function simpleHTML(A,P,use,w,beta,pb,psh,mS,val){
   const ps=portSeries(A,w);if(ps.length<30)return "";
@@ -1237,6 +1325,7 @@ const HELP={
  pb:"P/B = share price ÷ book value per share. Below 1 means the price is less than the company's net assets on paper.",
  roe:"ROE (return on equity) = profit ÷ shareholders' money. Above 15% is usually considered good.",
  de:"Debt to equity = borrowings ÷ shareholders' money. Higher means more borrowed money and more financial risk.",
+ models:"CAPM uses one risk (the market). Fama-French adds company size and value. APT adds economic risks like interest rates, gold, the dollar and oil. Each gives an estimate of a fair yearly return for the risks the stock carries.",
  req:"Required return: the yearly growth your money needs to reach the goal in time.",
  alloc:"Asset allocation: how the money is split between equity (growth, more risk), debt (steady) and gold (protection)."
 };
