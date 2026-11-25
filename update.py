@@ -245,6 +245,18 @@ def etfs_and_trusts():
     return rows
 
 
+def drop_holidays(dates, vals):
+    """Yahoo sometimes adds a row on an NSE holiday (e.g. 15 Jan 2026) that just repeats the day before.
+    Drop a row when Nifty 50 has no price that day and the close is unchanged."""
+    if MKT is None or len(dates) < 2:
+        return dates, vals
+    open_days = {d.strftime("%Y-%m-%d") for d in MKT.index}
+    first = min(open_days)
+    keep = [i for i in range(len(dates))
+            if i == 0 or dates[i] in open_days or dates[i] < first or vals[i] != vals[i - 1]]
+    return [dates[i] for i in keep], [vals[i] for i in keep]
+
+
 def fix_jumps(dates, vals):
     """Yahoo does not adjust old prices for demergers (e.g. Tata Motors -> TMPV on 14 Oct 2025)
     and has a few bad prints. NSE price bands make a real one-day move of 40%+ very rare, so when the
@@ -427,6 +439,7 @@ def main():
             dates = [d.strftime("%Y-%m-%d") for d in s.index]
             vals = [round(float(v), 2) for v in s.values]
             dates, vals, used = with_nse(sym, dates, vals, nse_date, nse)
+            dates, vals = drop_holidays(dates, vals)
             vals, adj = fix_jumps(dates, vals)
             from_nse += used
             with open(path, "w", encoding="utf-8") as f:

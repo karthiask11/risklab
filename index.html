@@ -292,17 +292,17 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
 <template id="t-learn">
   <h2>How each number is calculated</h2>
   <div class="cards">
-    <div class="panel"><h3>Daily return</h3><p>R = today's close ÷ yesterday's close − 1. Prices are adjusted for splits and bonus issues, so a 1:1 bonus does not look like a −50% day.</p></div>
+    <div class="panel"><h3>Daily return</h3><p>R = today's close ÷ yesterday's close − 1. Prices are adjusted for splits, bonus issues and demergers, so a 1:1 bonus does not look like a −50% day. Dividends are not added, so this is the price return.</p></div>
     <div class="panel"><h3>Average and risk (SD)</h3><p>Average = sum of R ÷ n. Variance = Σ(R − average)² ÷ (n − 1). Daily SD = √variance. This is Excel's <code>STDEV.S</code>.</p></div>
-    <div class="panel"><h3>Annual figures</h3><p>Annual return = average daily return × 252. Annual risk = daily SD × √252. Risk grows with the square root of time.</p></div>
+    <div class="panel"><h3>Annual figures</h3><p>Annual return = average daily return × 252. Annual risk = daily SD × √252. 252 is the number of trading days in a year. Variance adds up day by day (if days are independent), so risk grows with the square root of time.</p></div>
     <div class="panel"><h3>Price return and CAGR</h3><p>Price return = end price ÷ start price − 1. CAGR = (end ÷ start)^(1 ÷ years) − 1, the steady yearly rate.</p></div>
     <div class="panel"><h3>Covariance and correlation</h3><p>Covariance = Σ(RA − avgA)(RB − avgB) ÷ (n − 1). Correlation ρ = covariance ÷ (SD A × SD B), from −1 to +1. Low ρ means better diversification.</p></div>
     <div class="panel"><h3>Two-stock risk</h3><p>σp² = wA²σA² + wB²σB² + 2·wA·wB·ρ·σA·σB. Lowest-risk weight in A = (σB² − Cov) ÷ (σA² + σB² − 2·Cov).</p></div>
-    <div class="panel"><h3>Many stocks</h3><p>Return = Σ wᵢ·Rᵢ. Variance = Σᵢ Σⱼ wᵢ·wⱼ·Covᵢⱼ: every pair of stocks adds a covariance term. Risk = √variance.</p></div>
+    <div class="panel"><h3>Many stocks</h3><p>Return = Σ wᵢ·Rᵢ. Variance = Σᵢ Σⱼ wᵢ·wⱼ·Covᵢⱼ: every pair of stocks adds a covariance term. Risk = √variance. If a stock has a shorter history in the period, its own return and risk use its own days, and each covariance uses the days both stocks traded.</p></div>
     <div class="panel"><h3>Share of risk</h3><p>Share from stock i = wᵢ × Σⱼ wⱼ·Covᵢⱼ ÷ portfolio variance. Shares add up to 100%; a stock can add more risk than its weight.</p></div>
     <div class="panel"><h3>Sharpe ratio</h3><p>Sharpe = (annual return − risk-free rate) ÷ annual risk. It is the extra return for each unit of risk; higher is better. Set the risk-free rate (for example the T-bill or G-sec yield) on the Portfolio page.</p></div>
     <div class="panel"><h3>Beta vs Nifty 50</h3><p>Beta = Cov(stock, Nifty 50) ÷ Var(Nifty 50), from daily returns on the same days. Beta 1.2 means the stock moved about 1.2% when Nifty moved 1%. Portfolio beta = Σ weight × beta.</p></div>
-    <div class="panel"><h3>Expected return (CAPM)</h3><p>E(R) = risk-free rate + beta × (expected market return − risk-free rate). Portfolio expected return = Σ weight × E(R). Likely range next year = E(R) ± 1 SD (about 68%) or ± 2 SD (about 95%).</p></div>
+    <div class="panel"><h3>Expected return (CAPM)</h3><p>E(R) = risk-free rate + beta × (expected market return − risk-free rate). Portfolio expected return = Σ weight × E(R). Likely range next year = E(R) ± 1 SD (about 68%) or ± 2 SD (about 95%), if returns follow a normal (bell-shaped) curve.</p></div>
     <div class="panel"><h3>Alpha and Treynor</h3><p>Jensen's alpha = actual return − [risk-free + beta × (Nifty's actual return − risk-free)]. Treynor = (return − risk-free) ÷ beta: return for each unit of market risk.</p></div>
     <div class="panel"><h3>Efficient frontier and optimiser</h3><p>For each target return, the lowest-risk mix of your stocks (weights 0% or more, adding to 100%, up to your limit per stock). The lowest-risk mix is the left tip; the best-Sharpe mix is where a line from the risk-free rate just touches the curve.</p></div>
     <div class="panel"><h3>Weights</h3><p>By quantity: weight = quantity × latest price ÷ total value. By weight %: the numbers you type, scaled to add up to 100%.</p></div>
