@@ -27,6 +27,9 @@ jobs:
           python-version: "3.12"
       - run: pip install --quiet yfinance pandas requests
       - run: python update.py
+      - name: Company fundamentals (a few hundred a day)
+        run: python fundamentals.py || echo "fundamentals skipped"
+        timeout-minutes: 12
       - name: Save prices to the repository
         run: |
           git config user.name "price-bot"

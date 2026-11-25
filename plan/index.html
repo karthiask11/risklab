@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){var m=location.pathname.match(/^(.*\/)(?:plan|portfolio|perf|pair|single|screen|learn)\/?(?:index\.html)?$/);var b=m?m[1]:location.pathname.replace(/[^\/]*$/,"");document.write('<base href="'+b+'">');window.BASE=b})();</script>
+<title>Portfolio Risk Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE work: a money tool, calm and exact, like a central bank bulletin
+   IDEA a risk desk's portfolio sheet: holdings on one side, the verdict drawn beside it
+   PICTURE live risk-vs-return chart: each stock a dot, the portfolio a large ring
+   COLOUR white ground, ink #14161a, deep teal #0b5d63 leads, red only for losses; night #0d1416
+   TYPE Libre Caslon Text for titles and big figures + Inter for everything else
+   LAYOUT laptop: editor left, result right; phone: title, result, editor, details */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0d1416);--ink:light-dark(#14161a,#e4ecec);--mute:light-dark(#5b6670,#93a4a8);--rule:light-dark(#dde3e5,#22343a);--soft:light-dark(#f2f6f6,#132026);--teal:light-dark(#0b5d63,#5cc0bc);--tealbg:light-dark(#e3f0ef,#123236);--red:light-dark(#b42318,#ff7b6e);--band:light-dark(#0b5d63,#0f2a2e)}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;overflow-x:clip}
+h1,h2,.big{font-family:"Libre Caslon Text",Georgia,serif;letter-spacing:-.02em;line-height:1.05;margin:0}
+h1{font-size:clamp(28px,4vw,42px)}
+h2{font-size:22px;margin-bottom:12px}
+.top{background:var(--band);color:#fff;padding:20px max(5vw,16px) 16px}
+.status{font-size:14px;color:#cfe5e3;margin:6px 0 14px}
+.status b{color:#fff}
+.statusrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 16px}
+.statusrow .status{margin:6px 0 10px}
+.acct{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.acct .who{font-size:14px;color:#e6f2f1;max-width:16em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill{background:#fff;color:#0b5d63;border:0;border-radius:999px;font:600 14px Inter,sans-serif;min-height:38px;padding:0 16px;cursor:pointer}
+.cloudbox{background:var(--bg);border:1px solid var(--rule);border-radius:10px;padding:12px;margin-bottom:12px}
+.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tabs a{color:#fff;text-decoration:none;padding:9px 14px;border-radius:999px;background:rgba(255,255,255,.12);font-weight:600;font-size:15px;white-space:nowrap}
+.tabs a[aria-current]{background:#fff;color:#0b5d63}
+.seg{display:inline-flex;border:1px solid rgba(255,255,255,.5);border-radius:999px;overflow:hidden}
+.seg button{background:transparent;color:#fff;border:0;padding:0 13px;min-height:40px;font:600 14px Inter,sans-serif;cursor:pointer}
+.seg button[aria-pressed=true]{background:#fff;color:#0b5d63}
+main{padding:22px max(5vw,16px) 48px;max-width:1340px;margin:0 auto}
+.grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:28px;align-items:start}
+.panel{border:1px solid var(--rule);border-radius:12px;padding:16px;background:var(--bg)}
+.soft{background:var(--soft);border-color:transparent}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 6px;border-bottom:1px solid var(--rule);text-align:right;white-space:nowrap}
+th{font-weight:600;color:var(--mute);font-size:13px}
+th:first-child,td:first-child{text-align:left}
+td.n{font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+input{font:16px Inter,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;min-height:44px}
+input:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.btn{font:600 15px Inter,sans-serif;border-radius:8px;border:1px solid var(--teal);background:var(--teal);color:var(--bg);padding:0 16px;min-height:44px;cursor:pointer}
+.btn.ghost{background:var(--bg);color:var(--teal)}
+.pickbtn{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;font:600 17px Inter,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:8px 12px;min-height:52px;cursor:pointer}
+.pickbtn small{display:block;font:400 13px Inter,sans-serif;color:var(--mute)}
+.pickbtn::after{content:"▾";color:var(--teal);font-size:18px}
+.h{background:var(--bg);border:1px solid var(--rule);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.hh{display:flex;align-items:center;gap:8px}
+.hh .nm{flex:1;font-size:13px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rm{border:1px solid var(--rule);background:var(--bg);color:var(--red);font:600 14px Inter,sans-serif;border-radius:8px;min-height:40px;padding:0 12px;cursor:pointer}
+.hf{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:flex-end;margin-top:8px}
+.hf label{display:grid;font-size:13px;color:var(--mute);gap:2px}
+.hf input{width:104px;text-align:right}
+.hf input[type=radio]{width:auto;min-height:auto}
+.hf .kv{font-size:13px;color:var(--mute)}
+.hf .kv b{display:block;font:600 15px Inter,sans-serif;color:var(--ink);font-variant-numeric:tabular-nums}
+.warn{color:var(--red);font-size:13px;margin-top:6px}
+.figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(9em,1fr));gap:14px;margin-bottom:14px}
+.fig1 .lab{font-size:13px;color:var(--mute)}
+.big{font-size:clamp(30px,4vw,44px);white-space:nowrap}
+.mid{font:600 22px Inter,sans-serif;white-space:nowrap}
+.pos{color:var(--teal)}.neg{color:var(--red)}
+.note{font-size:13px;color:var(--mute);margin:8px 0 0}
+.fig{position:relative;min-height:330px}
+.fig>svg{position:absolute;inset:0;width:100%;height:100%}
+svg text{font:13px Inter,sans-serif;fill:var(--mute);paint-order:stroke;stroke:var(--bg);stroke-width:4px}
+svg .lbl{fill:var(--ink);font-weight:600}
+.meter{height:10px;background:var(--soft);border-radius:5px;overflow:hidden;min-width:60px}
+.meter i{display:block;height:100%;background:var(--teal)}
+.steps td:first-child{white-space:normal}
+details{margin-top:16px;border-top:1px solid var(--rule);padding-top:10px}
+summary{cursor:pointer;font-weight:600;color:var(--teal);min-height:40px;display:flex;align-items:center}
+.load{padding:28px 0;color:var(--mute)}
+.err{color:var(--red);font-size:14px}
+.banner{background:#fff3cd;color:#5c4400;border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:16px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(16em,1fr));gap:16px}
+.cards .panel h3{margin:0 0 6px;font-size:17px}
+code{font-size:14px;background:var(--soft);padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}
+section+section{margin-top:28px}
+input[type=range]{width:100%;accent-color:var(--teal);min-height:32px;padding:0;border:0}
+dialog{border:0;border-radius:14px;padding:0;width:min(560px,94vw);max-height:86vh;background:var(--bg);color:var(--ink);box-shadow:0 10px 40px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dh{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px}
+.dh h2{margin:0;font-size:20px}
+.x{border:0;background:transparent;color:var(--mute);font-size:26px;min-width:44px;min-height:44px;cursor:pointer}
+#pq{margin:0 16px 8px;width:calc(100% - 32px)}
+#plist{overflow-y:auto;max-height:calc(86vh - 130px);padding:0 8px 12px}
+#plist button{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid var(--rule);padding:10px 8px;min-height:52px;color:var(--ink);font:15px Inter,sans-serif;cursor:pointer}
+#plist button:hover{background:var(--soft)}
+#plist b{display:block}
+#plist span{color:var(--mute);font-size:13px}
+#plist .px{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+#plist button[disabled]{opacity:.45}
+.txrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end}.txrow label{font-size:14px;display:grid;gap:2px}.txrow .wide{grid-column:span 2}@media(max-width:600px){.txrow .wide{grid-column:1/-1}}#txList table{max-width:760px}
+.road{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,11em),1fr));gap:10px;counter-reset:r}.road a{display:grid;gap:4px;border:1px solid var(--rule);border-left:4px solid var(--teal);border-radius:10px;padding:10px 12px;text-decoration:none;color:var(--ink);background:var(--bg)}.road span{font-size:13px;color:var(--mute)}
+.q{border-top:1px solid var(--rule);padding:10px 0}.q p{margin:0 0 6px;font-weight:600}.q label{display:flex;gap:8px;align-items:center;font-size:14px;padding:3px 0}.q input{min-height:auto}
+.allocrow{display:grid;grid-template-columns:7em 1fr 4.5em;gap:10px;align-items:center;margin:6px 0}
+@media print{header,footer,nav,.noprint,.tabs,.seg,#acct,#cloud,button,.ctl,details summary{display:none!important}body{background:#fff}main{padding:0}.panel{break-inside:avoid}a{color:inherit;text-decoration:none}details{display:block}details>*{display:block}}
+.tip{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--teal);background:transparent;color:var(--teal);font:700 11px Inter,sans-serif;padding:0;cursor:pointer;vertical-align:middle;margin-left:4px}
+h2 .tip{width:20px;height:20px;font-size:12px}
+#tipPop{position:absolute;z-index:50;background:var(--ink);color:var(--bg);font:14px/1.45 Inter,sans-serif;padding:10px 12px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.amtbox{margin-top:14px;border:1px dashed var(--teal);border-radius:12px;padding:12px;background:var(--bg)}
+.amtbox h3{margin:0 0 8px;font-size:16px}
+.bench{display:flex;align-items:center;gap:8px;font-size:14px;flex-wrap:wrap}
+.simple{border:1px solid var(--rule);border-left:5px solid var(--teal);border-radius:14px;padding:16px 18px;background:var(--soft);margin:8px 0 24px}
+.simplegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,17em),1fr));gap:12px 22px}
+.simplegrid p{margin:4px 0 0;font-size:15px}
+.simple h3{margin:16px 0 4px;font-size:16px}.simple ul{margin:4px 0 8px;padding-left:20px}
+
+/* ---- polish ---- */
+.top{background:linear-gradient(135deg,#0b5d63 0%,#0a4a50 55%,#123a52 100%);box-shadow:0 2px 14px rgba(0,0,0,.12)}
+.brand{color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;flex:none}
+.tabs a{transition:background .15s,color .15s}
+.tabs a:hover{background:rgba(255,255,255,.24)}
+@media(max-width:700px){.tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:0 -16px;padding:0 16px 4px}.tabs::-webkit-scrollbar{display:none}.tabs a{flex:none}.logo{width:32px;height:32px}}
+.panel{box-shadow:0 1px 2px rgba(16,24,40,.04),0 4px 16px rgba(16,24,40,.04);transition:border-color .15s,box-shadow .15s,transform .15s}
+.cards a:hover .panel,.road a:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(11,93,99,.12)}
+.road a{transition:transform .15s,box-shadow .15s}
+.fig1{background:var(--soft);border:1px solid var(--rule);border-radius:12px;padding:12px 14px}
+.fig1 .big{font-size:clamp(28px,3.4vw,40px)}
+main h2{position:relative}
+main section>h2:first-child,main>h2{padding-left:12px;border-left:4px solid var(--teal)}
+.btn{transition:filter .15s,transform .05s}.btn:hover{filter:brightness(1.08)}.btn:active{transform:translateY(1px)}
+table th{font-size:13px;letter-spacing:.01em}
+tbody tr:hover td{background:color-mix(in srgb,var(--teal) 5%,transparent)}
+footer{background:var(--soft);line-height:1.6}
+#main{animation:fadein .25s ease}
+@keyframes fadein{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){#main{animation:none}.panel,.road a{transition:none}}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22em),1fr));gap:20px;align-items:start}
+.hero{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:28px;align-items:center}
+.hero h2{font-size:clamp(32px,4.4vw,50px);margin-bottom:14px}
+.hero p{font-size:17px;max-width:46ch;margin:0 0 18px}
+.strip{display:flex;flex-wrap:wrap;gap:8px 22px;margin:18px 0 0;font-size:14px;color:var(--mute)}
+.strip b{color:var(--ink);font-size:18px;display:block}
+.cards a{color:inherit;text-decoration:none}
+.cards a .panel{height:100%}
+.cards a:hover .panel{border-color:var(--teal)}
+.cards .go{color:var(--teal);font-weight:600;font-size:14px}
+.steps3{display:grid;grid-template-columns:repeat(auto-fit,minmax(14em,1fr));gap:16px;counter-reset:s}
+.steps3 div{border-top:3px solid var(--teal);padding-top:10px}
+.faq details{border-top:1px solid var(--rule);margin:0;padding:6px 0}
+.faq p{margin:4px 0 10px;color:var(--mute)}
+.score{display:flex;align-items:baseline;gap:10px}
+.score .big{font-size:clamp(44px,6vw,64px)}
+.bars div{display:grid;grid-template-columns:minmax(7em,11em) minmax(0,1fr) 3.2em;gap:10px;align-items:center;font-size:14px;margin:6px 0}
+.bars .v{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tips{margin:10px 0 0;padding-left:20px;font-size:14px}
+.tips li{margin:4px 0}
+.ctl{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.ctl input,.ctl select{flex:1 1 11em}
+select{font:16px Inter,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;min-height:44px}
+.add{border:1px solid var(--teal);background:var(--bg);color:var(--teal);font:600 14px Inter,sans-serif;border-radius:8px;min-height:36px;padding:0 10px;cursor:pointer}
+.add[disabled]{border-color:var(--rule);color:var(--mute)}
+th.sort{cursor:pointer;color:var(--teal)}
+#stab td:first-child{white-space:normal;max-width:10em}
+@media(max-width:600px){#stab .add{padding:0 8px}#stab td:first-child{max-width:7.5em}}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13px;color:var(--mute)}
+@media(max-width:900px){.hero{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.hide-s{display:none}.bars div{grid-template-columns:minmax(6em,8em) minmax(0,1fr) 3em}}
+@media(max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){table{font-size:13px}th,td{padding:6px 4px}.fig{min-height:270px}.tabs a{padding:8px 11px;font-size:14px}}
+@media(prefers-reduced-motion:no-preference){.ring{transition:cx .4s,cy .4s}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1><a href="./" data-v="home" class="brand"><svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="none" stroke="currentColor" stroke-width="3" opacity=".35"/><path d="M20 2a18 18 0 0 1 17.1 23.6" fill="none" stroke="#7fe0d6" stroke-width="3.5" stroke-linecap="round"/><path d="M9 26l7-7 5 4 9-10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>Portfolio Risk Lab</a></h1>
+  <div class="statusrow"><p class="status" id="status">Loading prices…</p><div id="acct" class="acct"></div></div>
+  <div class="bar">
+    <nav class="tabs" id="tabs">
+      <a href="./" data-v="home">Home</a><a href="plan/" data-v="plan">Plan</a><a href="portfolio/" data-v="portfolio">Portfolio</a><a href="perf/" data-v="perf">Performance</a><a href="pair/" data-v="pair">Two stocks</a><a href="single/" data-v="single">One stock</a><a href="screen/" data-v="screen">Screener</a><a href="learn/" data-v="learn">Formulas</a>
+    </nav>
+    <div class="seg" id="period" role="group" aria-label="Period">
+      <button data-y="1" aria-pressed="true">1Y</button><button data-y="3" aria-pressed="false">3Y</button><button data-y="5" aria-pressed="false">5Y</button><button data-y="10" aria-pressed="false">10Y</button>
+    </div>
+  </div>
+</header>
+<main id="main"></main>
+<footer>Portfolio Risk Lab · a free, non-commercial student project for learning portfolio maths · <b>Not investment advice.</b> The maker is not registered with SEBI as an investment adviser or research analyst; nothing here is a recommendation to buy or sell. Results use past data and do not predict the future. Built with the help of AI (Claude). Prices: NSE bhavcopy and Yahoo Finance, about 15 minutes delayed during market hours. ·
+<button class="add" id="privBtn" type="button" style="border:0;padding:0">Privacy</button> · <button class="add" id="eduBtn" type="button" style="border:0;padding:0">Education mode</button></footer>
+<div class="toast" id="toast" role="status"></div>
+
+<dialog id="authDlg" aria-labelledby="aT">
+  <div class="dh"><h2 id="aT">Sign in</h2><button class="x" id="aClose" aria-label="Close">×</button></div>
+  <div style="padding:0 16px 18px;display:grid;gap:10px">
+    <p class="note" style="margin:0">Save your portfolios to your account and open them on any device.</p>
+    <button class="btn" id="aGoogle" type="button">Continue with Google</button>
+    <p class="note" style="text-align:center;margin:2px 0">or use your email</p>
+    <input id="aEmail" type="email" autocomplete="email" placeholder="Email">
+    <input id="aPass" type="password" autocomplete="current-password" placeholder="Password (6+ characters)">
+    <div style="display:flex;gap:10px"><button class="btn ghost" id="aIn" type="button" style="flex:1">Sign in</button><button class="btn ghost" id="aNew" type="button" style="flex:1">Create account</button></div>
+    <button class="add" id="aForgot" type="button" style="justify-self:start;border:0;padding:0">Forgot password?</button>
+    <p class="note" style="margin:0">By signing in you agree that your email and saved portfolios are stored to show them to you. <button class="add" id="aPriv" type="button" style="border:0;padding:0">Privacy</button></p>
+    <p class="err" id="aErr" role="alert" style="margin:0"></p>
+  </div>
+</dialog>
+<dialog id="privDlg" aria-labelledby="prT">
+  <div class="dh"><h2 id="prT">Privacy</h2><button class="x" id="prClose" aria-label="Close">×</button></div>
+  <div style="padding:0 16px 18px;font-size:15px;line-height:1.5">
+    <p><b>Without signing in</b> nothing about you leaves your device. Your holdings are kept only in your browser (local storage).</p>
+    <p><b>If you sign in</b>, we store your email address, your name from Google (if you use Google) and the portfolios you save. They are stored in Google Firebase so you can open them on any device. Only you can read them; database rules block everyone else.</p>
+    <p>We use this data only to show you your portfolios. We do not sell or share it, show ads, or use tracking or analytics cookies.</p>
+    <p><b>Your choices:</b> rename or delete any portfolio, or delete your whole account and all saved portfolios with “Delete account” at the top of the page after signing in.</p>
+    <p class="note">Questions or requests: open an issue at github.com/karthiask11/risklab. This notice follows the Digital Personal Data Protection Act, 2023.</p>
+  </div>
+</dialog>
+<dialog id="nameDlg" aria-labelledby="nTitle">
+  <form id="nForm" style="padding:16px;display:grid;gap:12px">
+    <h2 id="nTitle" style="margin:0;font-size:20px">Name</h2>
+    <input id="nIn" maxlength="80" autocomplete="off">
+    <div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn ghost" id="nCancel" type="button">Cancel</button><button class="btn" type="submit">Save</button></div>
+  </form>
+</dialog>
+<dialog id="pick">
+  <div class="dh"><h2 id="ptitle">Choose a stock</h2><button class="x" id="pclose" aria-label="Close">×</button></div>
+  <input id="pq" type="search" placeholder="Search name or symbol" autocomplete="off">
+  <div id="plist"></div>
+</dialog>
+
+<template id="t-home">
+  <section class="hero">
+    <div>
+      <h2>Know the risk before you invest.</h2>
+      <p>A free risk and return calculator for NSE stocks. Check your portfolio's health, mix two stocks, or screen the Nifty 500. Every number shows its formula.</p>
+      <div class="row" style="display:flex;flex-wrap:wrap;gap:10px"><a class="btn" href="portfolio/" data-v="portfolio" style="display:inline-flex;align-items:center;text-decoration:none">Check my portfolio</a><a class="btn ghost" href="screen/" data-v="screen" style="display:inline-flex;align-items:center;text-decoration:none">Open the screener</a></div>
+      <div class="strip" id="hstrip"></div>
+    </div>
+    <div class="panel">
+      <h3 style="margin:0 0 4px;font-size:16px" id="htitle">Risk vs return</h3>
+      <div class="fig" id="hfig" style="min-height:300px"><svg role="img" aria-label="Risk and return of every stock"></svg></div>
+      <p class="note" id="hnote"></p>
+    </div>
+  </section>
+  <section>
+    <h2>The portfolio management process, start to end</h2>
+    <p class="note" style="margin-top:0">The same steps a portfolio manager follows (CFA Institute's planning → execution → feedback cycle). Tap a step to open it.</p>
+    <div class="road">
+      <a href="plan/" data-v="plan"><b>1 · Plan</b><span>Risk profile, goal, time horizon</span></a>
+      <a href="plan/" data-v="plan"><b>2 · Asset allocation</b><span>Equity, debt and gold mix</span></a>
+      <a href="screen/" data-v="screen"><b>3 · Select</b><span>Screen stocks and ETFs</span></a>
+      <a href="portfolio/" data-v="portfolio"><b>4 · Build</b><span>Weights, risk, optimiser</span></a>
+      <a href="perf/" data-v="perf"><b>5 · Execute</b><span>Record buys and sells</span></a>
+      <a href="portfolio/" data-v="portfolio"><b>6 · Monitor and rebalance</b><span>Drift from your plan, bad-day risk</span></a>
+      <a href="perf/" data-v="perf"><b>7 · Evaluate and report</b><span>TWRR, XIRR vs Nifty, print report</span></a>
+    </div>
+  </section>
+  <section>
+    <h2>What you can do</h2>
+    <div class="cards">
+      <a href="portfolio/" data-v="portfolio"><div class="panel"><h3>Portfolio health score</h3><p>A 0–10 score for diversification, from your number of stocks, biggest holding, biggest sector and how alike your stocks move, with tips to improve it.</p><span class="go">Check my portfolio →</span></div></a>
+      <a href="portfolio/" data-v="portfolio"><div class="panel"><h3>Risk, return and sectors</h3><p>Your portfolio's yearly risk and return, how much risk mixing removes, each stock's share of risk, correlations and sector split.</p><span class="go">See my portfolio →</span></div></a>
+      <a href="pair/" data-v="pair"><div class="panel"><h3>Two-stock mixer</h3><p>Slide the weight between any two stocks and see the risk change, with the lowest-risk mix marked.</p><span class="go">Mix two stocks →</span></div></a>
+      <a href="single/" data-v="single"><div class="panel"><h3>One-stock deep dive</h3><p>Price chart, CAGR, daily and yearly risk, best and worst day, and the biggest fall from a peak.</p><span class="go">Study a stock →</span></div></a>
+      <a href="screen/" data-v="screen"><div class="panel"><h3>Stock screener</h3><p>Screen the Nifty 500, every NSE-listed stock, or ETFs, REITs and InvITs. Filter by sector and sort by Sharpe ratio, return, risk, CAGR or beta. Add any stock to your portfolio in one tap.</p><span class="go">Screen stocks →</span></div></a>
+      <a href="portfolio/" data-v="portfolio"><div class="panel"><h3>Optimiser and efficient frontier</h3><p>Find the lowest-risk and best-Sharpe weights for your stocks, see the efficient frontier, and apply the weights in one tap. Download everything for Excel.</p><span class="go">Optimise my portfolio →</span></div></a>
+      <a href="learn/" data-v="learn"><div class="panel"><h3>Formulas explained</h3><p>Variance, standard deviation, covariance, correlation and portfolio risk in plain words, the same way you would do them in Excel.</p><span class="go">Learn the maths →</span></div></a>
+    </div>
+  </section>
+  <section>
+    <h2>How it works</h2>
+    <div class="steps3">
+      <div><b>1. Prices update every evening</b><p class="note">After the market closes, NSE's official closing prices for the Nifty 500 are added to up to 10 years of split- and bonus-adjusted history.</p></div>
+      <div><b>2. Add what you own</b><p class="note">Pick stocks from the list and enter quantity and buy price, or set weights. Your holdings stay in your own browser.</p></div>
+      <div><b>3. Read the result</b><p class="note">Choose 1, 3, 5 or 10 years. Risk, return, health score and every step of the calculation update at once.</p></div>
+    </div>
+  </section>
+  <section class="faq">
+    <h2>Questions</h2>
+    <details><summary>Where do the prices come from?</summary><p>The latest day's price is NSE's official closing price from the NSE bhavcopy (NSE's end-of-day price file). Older daily prices come from Yahoo Finance, adjusted for splits and bonus issues but not dividends. Prices update every weekday evening after NSE publishes its file.</p></details>
+    <details><summary>What does "risk" mean here?</summary><p>Risk is the standard deviation of daily returns, turned into a yearly figure (daily SD × √252). It shows how much the return usually swings above or below its average.</p></details>
+    <details><summary>Is this investment advice?</summary><p>No. It measures what happened in the past to help you learn and compare. Past risk and return do not predict the future.</p></details>
+    <details><summary>Is my portfolio private?</summary><p>Yes. Without signing in, holdings stay only in your browser. If you sign in, your portfolios are stored in your own private space in the database; security rules let only you read or change them.</p></details>
+    <details><summary>Can I save more than one portfolio?</summary><p>Yes. Sign in with Google or email, then use New, Save as new, Rename and Delete on the Portfolio page. Your portfolios open on any phone or laptop where you sign in.</p></details>
+    <details><summary>Does it cost anything?</summary><p>No. The whole site is free.</p></details>
+  </section>
+</template>
+
+<template id="t-screen">
+  <h2>Screener</h2>
+  <div class="ctl">
+    <input id="sq" type="search" placeholder="Search name or symbol" aria-label="Search">
+    <select id="suni" aria-label="Stocks to show"><option value="n5">Nifty 500 stocks</option><option value="all">All NSE stocks</option><option value="other">Other NSE stocks</option><option value="fund">ETFs, REITs and InvITs</option></select>
+    <select id="ssec" aria-label="Sector"></select>
+    <label style="display:flex;align-items:center;gap:6px;font-size:14px;flex:0 1 auto">Risk-free %<input id="srf" inputmode="decimal" style="width:80px"></label>
+    <select id="ssort" aria-label="Sort">
+      <option value="rr">Highest Sharpe ratio (past)</option>
+      <option value="ar">Highest yearly return</option>
+      <option value="lowk">Lowest risk</option>
+      <option value="cagr">Highest CAGR</option>
+      <option value="lowb">Lowest beta</option>
+      <option value="chg">Today's change</option>
+      <option value="liq">Most traded</option>
+      <option value="pe">Lowest P/E</option>
+      <option value="roe">Highest ROE</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:6px;font-size:14px;flex:0 1 auto"><input type="checkbox" id="sliq" style="width:auto"> Hide hard-to-trade (under ₹1 crore a day)</label>
+  </div>
+  <p class="note" id="scount" style="margin:0 0 8px"></p>
+  <div class="scroll"><table id="stab"></table></div>
+  <p class="note">Return and risk are yearly figures for the chosen period (1Y, 3Y, 5Y or 10Y). Sharpe = (yearly return − risk-free rate) ÷ yearly risk; higher is better. Beta: how much the stock moves when Nifty 50 moves 1%. Stocks without enough history for the period are hidden. Return includes dividends. Traded = average value traded a day over the last 3 months; under ₹1 crore can be hard to buy or sell. <b>This list sorts past data for learning. It is not a recommendation to buy or sell.</b></p>
+</template>
+
+<template id="t-portfolio">
+  <div class="grid">
+    <section class="panel soft">
+      <h2>My holdings</h2>
+      <div id="cloud"></div>
+      <div class="hf" style="margin:0 0 12px">
+        <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="radio" name="mode" value="qty" style="min-height:auto"> By quantity</label>
+        <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="radio" name="mode" value="wt" style="min-height:auto"> By weight %</label>
+      </div>
+      <div id="hold"></div>
+      <button class="btn" id="addBtn" type="button" style="width:100%">+ Add a stock</button>
+      <div class="amtbox">
+        <h3>How much to invest? <button class="tip" type="button" data-tip="amt" aria-label="What does this mean?">?</button></h3>
+        <div class="txrow">
+          <label>Amount ₹<input id="amtIn" inputmode="decimal"></label>
+          <label>Split<select id="amtHow"><option value="eq">Equally</option><option value="wt">By weight %</option></select></label>
+          <button class="btn ghost" id="amtGo" type="button">Work out shares</button>
+        </div>
+        <div id="amtRes"></div>
+      </div>
+      <div id="benchBox" style="margin-top:12px"></div>
+      <p class="note" id="saved">Your holdings are saved in this browser. Sign in to keep several portfolios on any device.</p>
+    </section>
+    <section class="result"><div id="pres"></div></section>
+  </div>
+  <div id="pdetail"></div>
+</template>
+
+<template id="t-pair">
+  <div class="grid">
+    <section class="panel soft">
+      <h2>Pick two stocks</h2>
+      <div style="display:grid;gap:10px"><button class="pickbtn" id="pa"></button><button class="pickbtn" id="pb"></button></div>
+      <p style="margin:16px 0 4px;font-size:14px" id="pwl"></p>
+      <input type="range" id="pw" min="0" max="100" step="1" aria-label="Weight in the first stock">
+    </section>
+    <section class="result"><div id="pairres"></div></section>
+  </div>
+  <div id="psteps" style="margin-top:18px"></div>
+</template>
+
+<template id="t-single">
+  <div class="grid">
+    <section class="panel soft">
+      <h2>Pick a stock</h2>
+      <button class="pickbtn" id="ss"></button>
+    </section>
+    <section class="result"><div id="sres"></div></section>
+  </div>
+  <div id="sstats" style="margin-top:18px;max-width:760px"></div>
+</template>
+
+<template id="t-perf">
+  <section class="panel soft">
+    <div id="cloud"></div>
+    <h2>Buy and sell list</h2>
+    <p class="note" style="margin-top:0">Add each buy and sell with its date. The site then measures your real performance the way SEBI asks portfolio managers to: TWRR, plus your XIRR, against Nifty 50.</p>
+    <div class="txrow">
+      <label>Date<input id="txD" type="date"></label>
+      <label class="wide">Stock<button class="pickbtn" id="txS" type="button"></button></label>
+      <label>Type<select id="txT"><option value="buy">Buy</option><option value="sell">Sell</option></select></label>
+      <label>Quantity<input id="txQ" inputmode="decimal" value="10"></label>
+      <label>Price ₹ per share<input id="txP" inputmode="decimal"></label>
+      <button class="btn" id="txAdd" type="button">Add to list</button>
+    </div>
+    <p class="note" id="txHint" style="margin:6px 0 0">Price is filled with that day's close; change it to your real price.</p>
+    <p class="err" id="txErr" role="alert" style="margin:4px 0 0"></p>
+    <div id="txList" style="margin-top:12px"></div>
+    <div id="benchBoxP" style="margin-top:10px"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center">
+      <button class="add" id="txImp" type="button">Import CSV</button><input type="file" id="txFile" accept=".csv,text/csv" hidden>
+      <button class="add" id="txExp" type="button">Export CSV</button>
+      <button class="add" id="txEx" type="button">Load an example</button>
+      <button class="add" id="txClr" type="button" style="color:var(--red)">Clear all</button>
+      <span class="note" style="margin:0">CSV columns: Date, Symbol, Type (Buy/Sell), Quantity, Price. Dates like 2025-01-31 or 31-01-2025.</span>
+    </div>
+  </section>
+  <section class="result" style="margin-top:22px"><h2>Your performance</h2><div id="perfres"></div></section>
+</template>
+
+<template id="t-plan">
+  <h2>Plan: the start of the process</h2>
+  <div class="road">
+      <a href="plan/" data-v="plan"><b>1 · Plan</b><span>Risk profile, goal, time horizon</span></a>
+      <a href="plan/" data-v="plan"><b>2 · Asset allocation</b><span>Equity, debt and gold mix</span></a>
+      <a href="screen/" data-v="screen"><b>3 · Select</b><span>Screen stocks and ETFs</span></a>
+      <a href="portfolio/" data-v="portfolio"><b>4 · Build</b><span>Weights, risk, optimiser</span></a>
+      <a href="perf/" data-v="perf"><b>5 · Execute</b><span>Record buys and sells</span></a>
+      <a href="portfolio/" data-v="portfolio"><b>6 · Monitor and rebalance</b><span>Drift from your plan, bad-day risk</span></a>
+      <a href="perf/" data-v="perf"><b>7 · Evaluate and report</b><span>TWRR, XIRR vs Nifty, print report</span></a>
+    </div>
+  <section class="panel soft" style="margin-top:18px">
+    <h2>Step 1 · Risk profile</h2>
+    <p class="note" style="margin-top:0">Answer for the person whose money it is. The score sets how much risk suits them (risk tolerance = willingness + ability).</p>
+    <div id="rq"></div>
+    <div id="rpres"></div>
+  </section>
+  <section class="panel soft" style="margin-top:18px">
+    <h2>Step 2 · Goal and time</h2>
+    <div class="txrow">
+      <label>Goal amount ₹<input id="gAmt" inputmode="decimal"></label>
+      <label>Years to goal<input id="gYrs" inputmode="decimal"></label>
+      <label>Money invested now ₹<input id="gNow" inputmode="decimal"></label>
+      <label>Monthly SIP ₹<input id="gSip" inputmode="decimal"></label>
+    </div>
+    <div id="gres" style="margin-top:10px"></div>
+  </section>
+  <section class="panel soft" style="margin-top:18px">
+    <h2>Step 3 · Asset allocation</h2>
+    <p class="note" style="margin-top:0">Choose the mix of equity, debt and gold. Risk and correlation come from 5 years of daily prices of NIFTYBEES (equity), GILT5YBEES (government bonds) and GOLDBEES (gold). Expected returns are your assumptions; change them to your own view.</p>
+    <div id="alloc"></div>
+  </section>
+  <section style="margin-top:22px">
+    <h2>Step 4 · Investment Policy Statement (IPS)</h2>
+    <div id="ips" class="panel"></div>
+    <p class="noprint" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="button" onclick="window.print()">Print / save as PDF</button><a class="btn ghost" href="screen/" data-v="screen" style="display:inline-flex;align-items:center;text-decoration:none">Next: select stocks →</a></p>
+  </section>
+</template>
+
+<template id="t-learn">
+  <h2>How each number is calculated</h2>
+  <div class="cards">
+    <div class="panel"><h3>Daily return</h3><p>R = today's close ÷ yesterday's close − 1. Prices are adjusted for splits, bonus issues and demergers, so a 1:1 bonus does not look like a −50% day. Dividends are added back on their ex-date: R = (today's close + dividend) ÷ yesterday's close − 1, so every return, risk, Sharpe and CAGR on this site is a total return. Benchmark: Nifty 50 Total Return Index when niftyindices.com provides it.</p></div>
+    <div class="panel"><h3>Average and risk (SD)</h3><p>Average = sum of R ÷ n. Variance = Σ(R − average)² ÷ (n − 1). Daily SD = √variance. This is Excel's <code>STDEV.S</code>.</p></div>
+    <div class="panel"><h3>Annual figures</h3><p>Annual return = average daily return × 252. Annual risk = daily SD × √252. 252 is the number of trading days in a year. Variance adds up day by day (if days are independent), so risk grows with the square root of time.</p></div>
+    <div class="panel"><h3>Price return and CAGR</h3><p>Price return = end price ÷ start price − 1. CAGR = (end ÷ start)^(1 ÷ years) − 1, the steady yearly rate.</p></div>
+    <div class="panel"><h3>Covariance and correlation</h3><p>Covariance = Σ(RA − avgA)(RB − avgB) ÷ (n − 1). Correlation ρ = covariance ÷ (SD A × SD B), from −1 to +1. Low ρ means better diversification.</p></div>
+    <div class="panel"><h3>Two-stock risk</h3><p>σp² = wA²σA² + wB²σB² + 2·wA·wB·ρ·σA·σB. Lowest-risk weight in A = (σB² − Cov) ÷ (σA² + σB² − 2·Cov).</p></div>
+    <div class="panel"><h3>Many stocks</h3><p>Return = Σ wᵢ·Rᵢ. Variance = Σᵢ Σⱼ wᵢ·wⱼ·Covᵢⱼ: every pair of stocks adds a covariance term. Risk = √variance. If a stock has a shorter history in the period, its own return and risk use its own days, and each covariance uses the days both stocks traded.</p></div>
+    <div class="panel"><h3>Share of risk</h3><p>Share from stock i = wᵢ × Σⱼ wⱼ·Covᵢⱼ ÷ portfolio variance. Shares add up to 100%; a stock can add more risk than its weight.</p></div>
+    <div class="panel"><h3>Sharpe ratio</h3><p>Sharpe = (annual return − risk-free rate) ÷ annual risk. It is the extra return for each unit of risk; higher is better. Set the risk-free rate (for example the T-bill or G-sec yield) on the Portfolio page.</p></div>
+    <div class="panel"><h3>Beta vs Nifty 50</h3><p>Beta = Cov(stock, Nifty 50) ÷ Var(Nifty 50), from daily returns on the same days. Beta 1.2 means the stock moved about 1.2% when Nifty moved 1%. Portfolio beta = Σ weight × beta.</p></div>
+    <div class="panel"><h3>Expected return (CAPM)</h3><p>E(R) = risk-free rate + beta × (expected market return − risk-free rate). Portfolio expected return = Σ weight × E(R). Likely range next year = E(R) ± 1 SD (about 68%) or ± 2 SD (about 95%), if returns follow a normal (bell-shaped) curve.</p></div>
+    <div class="panel"><h3>Alpha and Treynor</h3><p>Jensen's alpha = actual return − [risk-free + beta × (Nifty's actual return − risk-free)]. Treynor = (return − risk-free) ÷ beta: return for each unit of market risk.</p></div>
+    <div class="panel"><h3>Efficient frontier and optimiser</h3><p>For each target return, the lowest-risk mix of your stocks (weights 0% or more, adding to 100%, up to your limit per stock). Expected returns come from CAPM (risk-free + beta × market premium; steadier) or from the period's past returns (your choice). The lowest-risk mix is the left tip; the highest-Sharpe mix is where a line from the risk-free rate just touches the curve. A maths example, not a recommendation.</p></div>
+    <div class="panel"><h3>VaR and CVaR</h3><p>Sort the period's daily portfolio returns from worst to best. 1-day VaR 95% = the loss at the worst 5% point: on 1 day in 20 you lose at least this much. CVaR 95% = the average of those worst 5% days. Historical method, no bell-curve assumption.</p></div>
+    <div class="panel"><h3>Sortino and drawdown</h3><p>Downside deviation = √[Σ min(0, R − risk-free ÷ 252)² ÷ n] × √252. Sortino = (annual return − risk-free) ÷ downside deviation: like Sharpe but only bad swings count. Max drawdown = the biggest fall from a peak to a later low.</p></div>
+    <div class="panel"><h3>Stress test and liquidity</h3><p>COVID test: each stock's total return from 19 Feb to 23 Mar 2020, combined with your weights. Liquidity: average close × volume over the last 3 months; under ₹1 crore a day is flagged as hard to trade.</p></div>
+    <div class="panel"><h3>Amount to shares</h3><p>Target money for each stock = amount × weight (equal: amount ÷ number of stocks). Shares = whole number of (target ÷ price). Leftover cash then buys one more share of the stock furthest below its target, while cash allows.</p></div>
+    <div class="panel"><h3>Return contribution</h3><p>Contribution of stock i = weight i × its yearly return. The contributions add up to the portfolio's return, so you see which stocks and sectors earned it. Compare with each stock's risk share.</p></div>
+    <div class="panel"><h3>Monte Carlo</h3><p>5,000 random futures, year by year: value × e^(m + s·Z), Z a standard normal draw, with s² = ln(1 + σ² ÷ (1 + μ)²) and m = ln(1 + μ) − s² ÷ 2, so the average yearly return is μ and the risk σ. The 10th, 50th and 90th percentiles give the bad, typical and good cases.</p></div>
+    <div class="panel"><h3>Benchmarks and fundamentals</h3><p>Compare with Nifty 50 TRI (dividends included) or a price index: Nifty 500, Next 50, Midcap 50, Smallcap 100, Bank, IT, Pharma, Auto, FMCG, Metal. Fundamentals from Yahoo Finance, refreshed through the week: P/E = price ÷ earnings per share, P/B = price ÷ book value per share, ROE = profit ÷ equity, debt to equity = debt ÷ equity.</p></div>
+    <div class="panel"><h3>Risk profile and required return</h3><p>Eight questions, each scored 1 to 5 (total 8–40), measure willingness and ability to take risk. Required return r solves: money now × (1 + i)ⁿ + SIP × [(1 + i)ⁿ − 1] ÷ i = goal, with i = (1 + r)^(1/12) − 1 and n = months.</p></div>
+    <div class="panel"><h3>Asset allocation risk</h3><p>Expected return = Σ weight × expected return of each asset. Risk = √(wᵀΣw) × √252, with Σ the daily covariance of NIFTYBEES, GILT5YBEES and GOLDBEES over 5 years. Chance of beating the required return ≈ Φ((expected − required) ÷ (risk ÷ √years)), assuming a bell curve.</p></div>
+    <div class="panel"><h3>Rebalancing</h3><p>Drift = asset's share now − target share. When any drift is more than ±5 percentage points, trade back to target: amount = drift × portfolio value (sell what is over, buy what is under).</p></div>
+    <div class="panel"><h3>TWRR (time-weighted return)</h3><p>Each day: r = (value at close + dividends received + sale money) ÷ (value at yesterday's close + money put in that day) − 1. TWRR = (1 + r₁)(1 + r₂)… − 1. Money you add or take out does not change it, so it measures the stock picking. SEBI requires portfolio managers to report TWRR; periods over 1 year are shown per year: (1 + TWRR)^(365 ÷ days) − 1.</p></div>
+    <div class="panel"><h3>XIRR (your money-weighted return)</h3><p>The yearly rate r that makes Σ cash flow ÷ (1 + r)^(days from first flow ÷ 365) = 0. Buys are money out (−), sales and dividends are money in (+), and today's value counts as money in at the end. Excel: =XIRR(values, dates). It depends on when you added money.</p></div>
+    <div class="panel"><h3>Same money in Nifty 50</h3><p>Every buy is copied into Nifty 50 units on the same day and every sale or dividend takes out the same rupees. Its XIRR shows what the index would have given you with exactly your timing (a "public market equivalent").</p></div>
+    <div class="panel"><h3>Realised and unrealised gain</h3><p>Sales are matched with the oldest shares first (FIFO, as for Indian tax). Realised gain = sale value − cost of those shares. Unrealised gain = today's value − cost of the shares you still hold. Dividends are added separately.</p></div>
+    <div class="panel"><h3>Education mode</h3><p>SEBI (circular of May 2026, from 1 July 2026) lets people engaged in education use stock prices only with a 30-day delay. Education mode stops every chart and number 30 days before the latest date and hides recent prices, so the site can be used in a class.</p></div>
+    <div class="panel"><h3>Weights</h3><p>By quantity: weight = quantity × latest price ÷ total value. By weight %: the numbers you type, scaled to add up to 100%.</p></div>
+  </div>
+  <p class="note" id="srcnote"></p>
+</template>
+
+<script>
+{
+const SAMPLE={"dates":["2025-11-24","2025-11-25","2025-11-26","2025-11-27","2025-11-28","2025-12-01","2025-12-02","2025-12-03","2025-12-04","2025-12-05","2025-12-08","2025-12-09","2025-12-10","2025-12-11","2025-12-12","2025-12-15","2025-12-16","2025-12-17","2025-12-18","2025-12-19","2025-12-22","2025-12-23","2025-12-24","2025-12-26","2025-12-29","2025-12-30","2025-12-31","2026-01-01","2026-01-02","2026-01-05","2026-01-06","2026-01-07","2026-01-08","2026-01-09","2026-01-12","2026-01-13","2026-01-14","2026-01-16","2026-01-19","2026-01-20","2026-01-21","2026-01-22","2026-01-23","2026-01-27","2026-01-28","2026-01-29","2026-01-30","2026-02-01","2026-02-02","2026-02-03","2026-02-04","2026-02-05","2026-02-06","2026-02-09","2026-02-10","2026-02-11","2026-02-12","2026-02-13","2026-02-16","2026-02-17","2026-02-18","2026-02-19","2026-02-20","2026-02-23","2026-02-24","2026-02-25","2026-02-26","2026-02-27","2026-03-02","2026-03-04","2026-03-05","2026-03-06","2026-03-09","2026-03-10","2026-03-11","2026-03-12","2026-03-13","2026-03-16","2026-03-17","2026-03-18","2026-03-19","2026-03-20","2026-03-23","2026-03-24","2026-03-25","2026-03-27","2026-03-30","2026-04-01","2026-04-02","2026-04-06","2026-04-07","2026-04-08","2026-04-09","2026-04-10","2026-04-13","2026-04-15","2026-04-16","2026-04-17","2026-04-20","2026-04-21","2026-04-22","2026-04-23","2026-04-24","2026-04-27","2026-04-28","2026-04-29","2026-04-30","2026-05-04","2026-05-05","2026-05-06","2026-05-07","2026-05-08","2026-05-11","2026-05-12","2026-05-13","2026-05-14","2026-05-15","2026-05-18","2026-05-19","2026-05-20","2026-05-21","2026-05-22","2026-05-25","2026-05-26","2026-05-27","2026-05-29","2026-06-01","2026-06-02","2026-06-03","2026-06-04","2026-06-05","2026-06-08","2026-06-09","2026-06-10","2026-06-11","2026-06-12","2026-06-15","2026-06-16","2026-06-17","2026-06-18","2026-06-19","2026-06-22","2026-06-23","2026-06-24","2026-06-25","2026-06-29","2026-06-30","2026-07-01","2026-07-02","2026-07-03","2026-07-06","2026-07-07","2026-07-08","2026-07-09","2026-07-10","2026-07-13","2026-07-14","2026-07-15","2026-07-16","2026-07-17","2026-07-20","2026-07-21","2026-07-22","2026-07-23","2026-07-24","2026-07-27","2026-07-28","2026-07-29","2026-07-30","2026-07-31","2026-08-03","2026-08-04","2026-08-05","2026-08-06","2026-08-07","2026-08-10","2026-08-11","2026-08-12","2026-08-13","2026-08-14","2026-08-17","2026-08-18","2026-08-19","2026-08-20","2026-08-21","2026-08-24","2026-08-25","2026-08-26","2026-08-27","2026-08-28","2026-08-31","2026-09-01","2026-09-02","2026-09-03","2026-09-04","2026-09-07","2026-09-08","2026-09-09","2026-09-10","2026-09-11","2026-09-15","2026-09-16","2026-09-17","2026-09-18","2026-09-21","2026-09-22","2026-09-23","2026-09-24","2026-09-25","2026-09-28","2026-09-29","2026-09-30","2026-10-01","2026-10-05","2026-10-06","2026-10-07","2026-10-08","2026-10-09","2026-10-12","2026-10-13","2026-10-14","2026-10-15","2026-10-16","2026-10-19","2026-10-21","2026-10-22","2026-10-23","2026-10-26","2026-10-27","2026-10-28","2026-10-29","2026-10-30","2026-11-02","2026-11-03","2026-11-04","2026-11-05","2026-11-06","2026-11-08","2026-11-09","2026-11-11","2026-11-12","2026-11-13","2026-11-16","2026-11-17","2026-11-18","2026-11-19","2026-11-20","2026-11-23"],"px":{"TCS":[3141.2,3119.2,3162.9,3136.6,3137.5,3133.4,3135.7,3180.0,3229.2,3238.2,3236.5,3208.3,3189.2,3191.9,3220.5,3230.2,3205.1,3217.8,3280.8,3282.0,3324.9,3310.0,3319.0,3280.0,3251.5,3246.8,3206.2,3227.4,3250.7,3216.1,3255.8,3295.6,3203.9,3207.8,3239.6,3268.0,3192.5,3206.7,3163.6,3102.3,3122.6,3150.4,3162.5,3158.0,3200.1,3144.4,3123.9,3186.9,3169.6,3225.3,2999.1,2991.5,2941.6,2948.2,2984.6,2909.8,2750.1,2692.2,2706.6,2717.4,2694.9,2677.9,2686.2,2676.3,2573.7,2629.3,2647.7,2637.4,2613.5,2587.8,2578.8,2557.6,2527.4,2513.1,2464.9,2442.4,2410.5,2409.2,2391.7,2440.8,2356.0,2390.6,2383.8,2398.8,2377.4,2389.8,2358.9,2408.2,2450.7,2473.9,2539.8,2559.2,2589.0,2524.3,2472.6,2554.9,2576.9,2581.5,2579.6,2610.5,2538.5,2521.8,2396.9,2447.6,2444.7,2474.7,2473.9,2431.3,2427.3,2435.4,2401.4,2394.4,2392.9,2300.3,2272.8,2246.0,2264.0,2283.2,2327.1,2327.4,2327.2,2317.3,2308.2,2276.2,2284.2,2258.9,2297.4,2446.9,2241.7,2241.0,2198.9,2151.4,2151.0,2153.9,2135.6,2161.4,2162.0,2199.0,2223.0,2203.3,2125.0,2127.8,2059.6,2109.0,2094.7,2097.9,2031.5,1982.6,2068.1,2093.5,2057.6,2096.1,2057.5,2049.5,2069.0,2181.5,2200.6,2189.2,2201.0,2269.0,2251.1,2221.1,2208.3,2242.9,2254.3,2295.6,2398.0,2446.6,2431.8,2365.6,2473.7,2460.0,2413.0,2373.0,2452.7,2425.7,2445.7,2349.7,2375.0,2361.0,2313.2,2280.0,2289.0,2298.0,2302.0,2284.1,2296.2,2270.0,2248.4,2342.0,2399.3,2369.0,2348.0,2320.1,2304.0,2270.0,2255.5,2208.0,2204.1,2200.8,2251.0,2188.8,2190.0,2105.0,2128.7,2105.0,2089.6,2087.0,2082.0,2070.7,2032.4,2050.6,2075.0,2114.4,2100.0,2080.3,2076.0,2156.0,2125.0,2269.3,2304.9,2350.0,2465.0,2460.9,2529.0,2506.9,2530.0,2535.0,2496.9,2460.0,2478.0,2502.6,2501.7,2499.1,2436.0,2495.7,2498.5,2498.8,2475.4,2472.1,2442.4,2407.5,2405.0,2406.6,2379.5,2342.7,2376.2,2460.0],"INFY":[1548.0,1530.6,1557.9,1566.4,1560.1,1564.0,1561.0,1578.7,1597.6,1616.2,1610.8,1599.0,1584.8,1598.0,1598.2,1606.8,1592.9,1602.0,1626.8,1638.7,1689.6,1668.3,1663.4,1656.1,1644.7,1621.6,1615.4,1629.8,1640.4,1606.4,1612.2,1639.0,1613.3,1614.1,1595.9,1599.0,1599.8,1689.8,1681.2,1658.9,1654.4,1663.5,1670.8,1682.7,1666.5,1659.5,1641.0,1654.5,1629.4,1656.0,1535.8,1520.2,1507.1,1497.2,1497.8,1471.9,1386.0,1369.1,1365.6,1391.2,1373.7,1370.5,1353.2,1327.5,1275.5,1290.1,1289.1,1300.1,1288.9,1307.4,1305.8,1308.4,1315.0,1295.6,1276.3,1265.8,1248.3,1249.8,1232.9,1267.1,1220.8,1255.9,1256.8,1278.3,1279.1,1269.7,1250.6,1275.7,1300.8,1306.2,1339.4,1346.2,1331.6,1292.5,1276.8,1305.3,1319.2,1318.7,1312.6,1313.2,1268.6,1240.6,1154.6,1170.3,1152.1,1167.5,1181.8,1168.4,1178.1,1167.2,1162.7,1179.2,1177.0,1140.3,1123.1,1095.0,1119.0,1142.5,1196.9,1193.7,1181.2,1174.5,1168.5,1167.7,1159.9,1160.9,1202.5,1270.8,1222.6,1201.3,1197.5,1187.6,1180.3,1145.3,1114.6,1116.4,1134.9,1143.6,1157.7,1127.5,1051.4,1065.4,1029.3,1056.6,1041.2,1036.7,1000.4,985.3,1040.9,1047.2,1042.2,1071.8,1069.3,1050.8,1068.0,1102.6,1092.9,1076.3,1082.4,1096.5,1087.1,1073.5,1052.1,1047.4,1040.9,1079.2,1105.7,1155.6,1155.1,1130.1,1180.0,1167.5,1174.0,1165.0,1175.1,1183.0,1190.7,1176.1,1175.0,1169.2,1139.9,1115.0,1119.8,1130.0,1121.0,1130.0,1144.0,1120.0,1110.8,1144.0,1133.8,1156.0,1140.0,1130.3,1130.0,1087.5,1082.0,1035.0,1036.5,1037.7,1077.0,1060.0,1058.6,1051.4,1038.5,1029.4,1020.5,1014.5,1000.2,1003.2,1015.4,994.1,1035.0,1020.5,1013.85,992.0,997.0,1023.4,1020.0,1062.1,1088.0,1110.0,1161.2,1130.7,1168.0,1153.35,1153.8,1166.0,1163.0,1123.15,1146.5,1185.0,1161.0,1148.1,1128.2,1167.4,1181.4,1171.6,1154.1,1155.0,1151.2,1141.5,1145.1,1130.0,1108.8,1091.9,1098.0,1103.4],"HDFCBANK":[999.15,989.8,1003.9,1009.5,1007.6,1002.1,989.8,1000.5,997.2,1003.3,1003.1,997.1,989.8,1000.3,1001.5,996.1,994.3,984.0,979.7,985.5,987.7,996.6,997.2,992.1,991.7,990.9,991.2,991.15,1001.6,977.5,962.2,949.05,946.7,939.0,936.95,937.35,925.45,931.1,927.9,931.2,920.35,918.7,916.1,926.4,932.7,935.5,929.25,922.1,928.1,948.7,953.1,949.7,941.1,937.25,932.4,927.1,920.6,903.9,925.8,925.7,924.7,915.6,911.85,923.6,910.5,907.6,898.6,887.75,879.4,868.65,877.75,857.05,840.7,849.45,833.95,832.75,817.0,840.6,845.35,843.05,798.2,780.45,744.15,764.9,782.3,756.2,731.55,742.25,750.9,771.0,772.0,816.1,797.7,810.3,794.7,809.9,795.45,799.9,795.45,811.75,799.9,784.35,784.85,789.8,782.55,779.0,771.7,779.4,772.3,796.55,796.05,780.85,763.65,750.45,749.6,769.55,767.5,768.65,762.45,759.5,759.15,766.8,786.85,778.9,758.65,744.55,742.7,748.25,753.65,754.2,747.05,738.65,738.35,746.85,744.6,772.45,777.35,784.9,787.1,799.0,779.8,786.4,774.65,793.2,796.3,798.9,797.95,796.15,795.9,801.05,829.85,829.3,810.3,817.55,824.95,817.95,809.4,815.45,808.3,819.6,777.6,761.45,753.15,747.25,742.8,739.55,735.4,748.2,753.95,748.15,753.0,742.0,735.0,734.3,731.0,731.0,729.0,729.0,725.0,727.0,729.0,723.0,720.0,725.05,726.95,729.0,727.5,727.2,711.0,720.3,709.0,711.9,700.8,706.65,712.1,710.5,703.0,687.1,693.8,708.25,716.55,721.5,713.0,731.0,739.5,738.6,737.25,728.9,735.6,719.05,722.7,708.7,721.2,704.8,711.45,702.75,692.25,707.25,704.9,714.0,710.7,726.85,728.85,712.0,706.95,694.05,692.8,688.05,680.2,685.3,683.3,692.8,700.0,725.5,736.7,760.0,788.25,784.1,798.15,806.6,812.3,804.0,816.5,814.95,808.15,821.8,846.0,817.8]},"names":{"TCS":"Tata Consultancy Services","INFY":"Infosys","HDFCBANK":"HDFC Bank"},"inds":{"TCS":"Information Technology","INFY":"Information Technology","HDFCBANK":"Financial Services"}};
+const TD=252;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const nz=t=>/^-0(\.0+)?$/.test(t)?t.slice(1):t,fx=(x,d=2)=>Number.isFinite(x)?nz(x.toFixed(d)):"–";
+const pct=(x,d=2)=>Number.isFinite(x)?nz((x*100).toFixed(d))+"%":"–";
+const num=(x,d=2)=>Number.isFinite(x)?x.toLocaleString("en-IN",{minimumFractionDigits:d,maximumFractionDigits:d}):"–";
+const cls=x=>x<0?"neg":"pos";
+const rs=(x,d=0)=>Number.isFinite(x)?(x<0?"−₹":"₹")+num(Math.abs(x),d):"–";
+const iso=d=>d.toISOString().slice(0,10);
+const addDays=(s,n)=>{const d=new Date(s+"T00:00:00Z");d.setUTCDate(d.getUTCDate()+n);return iso(d)};
+const subYears=(s,y)=>{const d=new Date(s+"T00:00:00Z");d.setUTCFullYear(d.getUTCFullYear()-y);return iso(d)};
+const fmtD=s=>new Date(s+"T00:00:00Z").toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"UTC"});
+
+let STOCKS={},LIST=[],meta=null,sample=false,saveT=null,token=0;
+const store={};
+const state={period:1,mode:"qty",holdings:[{sym:"TCS",qty:10,buy:3100,wt:30},{sym:"INFY",qty:20,buy:1500,wt:30},{sym:"HDFCBANK",qty:40,buy:950,wt:40}],pairA:"TCS",pairB:"HDFCBANK",pairW:50,single:"TCS",rf:0.065,cap:0.4,erm:null,edu:false,optmu:"capm",tx:[],txSym:"TCS",ips:null,bench:"^NIFTY",amt:100000,amtHow:"eq",mcY:5,mcMu:"capm"};
+let IDX="^NIFTY";const NIFTY="^NIFTY",hasIdx=()=>!!STOCKS[IDX],BN=()=>STOCKS[IDX]?STOCKS[IDX].name:"Nifty 50";
+const nm=s=>STOCKS[s]?STOCKS[s].name:s;
+const cleanSym=s=>String(s||"").trim().toUpperCase().replace(/[^A-Z0-9&\-]/g,"").slice(0,20);
+
+/* ---------- data ---------- */
+async function boot(){
+  try{
+    const r=await fetch("data/stocks.json",{cache:"no-cache"});if(!r.ok)throw 0;
+    LIST=(await r.json()).stocks;
+    try{meta=await (await fetch("data/meta.json",{cache:"no-cache"})).json()}catch(e){}
+  }catch(e){
+    sample=true;
+    for(const s in SAMPLE.px)store[s]=SAMPLE.dates.map((d,i)=>[d,SAMPLE.px[s][i]]);
+    LIST=Object.keys(SAMPLE.px).map(s=>{const p=SAMPLE.px[s],A=align([s],1),S=stats(A.px[0],A.ret[0],A.dates);
+      return {sym:s,name:SAMPLE.names[s],ind:SAMPLE.inds[s],last:p.at(-1),date:SAMPLE.dates.at(-1),chg:p.at(-1)/p.at(-2)-1,m:{1:[S.ar,S.ak,S.pr,S.cagr]}}});
+  }
+  STOCKS=Object.fromEntries(LIST.map(x=>[x.sym,x]));
+  if(meta&&Array.isArray(meta.indices))for(const x of meta.indices)STOCKS["^"+x.key]={sym:"^"+x.key,name:x.name,file:x.file,ind:"Index",last:x.last,date:x.date,m:x.m,m30:x.m30};
+  if(meta&&meta.nifty)STOCKS[NIFTY]={sym:NIFTY,name:meta.nifty.tri?"Nifty 50 TRI":"Nifty 50",file:meta.nifty.tri?"_NIFTY50TRI":"_NIFTY50",ind:"Index",last:meta.nifty.last,date:meta.nifty.date,m:meta.nifty.m,m30:meta.nifty.m30};
+  IDX=state.bench&&STOCKS[state.bench]?state.bench:NIFTY;
+  if(state.edu){const d=new Date(LIST.map(x=>x.date).sort().at(-1)+"T00:00:00Z");d.setUTCDate(d.getUTCDate()-30);EDU_CUT=d.toISOString().slice(0,10)}
+  status();route();
+  fetch("data/fund.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.f){FUND=j.f;const v=curView();if(["single","screen"].includes(v))route()}}).catch(()=>{});
+  if(!sample&&!state.edu){loadLive();setInterval(()=>{if(!document.hidden)loadLive()},5*60*1000)}
+}
+/* prices during market hours (about 15 minutes delayed), from the "live" branch */
+const LIVE_URL="https://raw.githubusercontent.com/karthiask11/risklab/live/live.json";
+let LIVE=null;
+async function loadLive(){
+  try{
+    const r=await fetch(LIVE_URL+"?t="+Math.floor(Date.now()/6e4),{cache:"no-store"});if(!r.ok)return;
+    const L=await r.json(),daily=LIST.map(x=>x.date).sort().at(-1);
+    const fresh=L.d>daily||(L.d===daily&&meta&&meta.updated&&Date.parse(L.t)>Date.parse(meta.updated));
+    if(!fresh||!L.p)return;
+    const first=!LIVE;LIVE=L;
+    for(const [sym,[p,c]] of Object.entries(L.p)){const x=STOCKS[sym];if(x){x.last=p;x.chg=c;x.date=L.d}}
+    if(L.nifty&&STOCKS[NIFTY]){STOCKS[NIFTY].last=L.nifty[0];STOCKS[NIFTY].chg=L.nifty[1]}
+    status();
+    const v=curView();
+    if(v==="home"||v==="screen"||v===""||first&&v==="portfolio")route();
+  }catch(e){}
+}
+const liveAge=()=>LIVE?Math.round((Date.now()-Date.parse(LIVE.t))/6e4):1e9;
+const inflight={};
+function ensure(sym){
+  if(store[sym])return Promise.resolve();
+  if(!STOCKS[sym])return Promise.reject(new Error(sym+" is not in the stock list. Remove it and pick from the list."));
+  return inflight[sym]??=fetch("data/"+encodeURIComponent(STOCKS[sym].file)+".json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw new Error(sym+": price file missing");return r.json()})
+    .then(j=>{const a=j.d.map((d,i)=>[d,Number(j.c[i])]).filter(x=>x[1]>0);a.tr=totalReturn(a,j.dv);a.dv=j.dv||[];store[sym]=a}).finally(()=>delete inflight[sym]);
+}
+/* dividends reinvested: older prices are scaled so the last value is the real last price */
+function totalReturn(a,dv){
+  if(!dv||!dv.length||a.length<2)return null;
+  const add=new Array(a.length).fill(0);let k=0;
+  for(const [d,amt] of dv){while(k<a.length&&a[k][0]<d)k++;if(k>0&&k<a.length)add[k]+=amt}
+  const f=[1];for(let i=1;i<a.length;i++)f.push(f[i-1]*(a[i][1]+add[i])/a[i-1][1]);
+  const m=a.at(-1)[1]/f.at(-1);return a.map((x,i)=>[x[0],f[i]*m]);
+}
+let EDU_CUT=null,FUND={};const fund=s=>FUND[s]||null;const eduCache=new WeakMap();
+/* the series every calculation uses: total return, and in education mode only data older than 30 days */
+const adjusted=e=>{let a=e.tr||e;if(!EDU_CUT)return a;if(!eduCache.has(a))eduCache.set(a,a.filter(x=>x[0]<=EDU_CUT));return eduCache.get(a)};
+const rawUpto=e=>EDU_CUT?e.filter(x=>x[0]<=EDU_CUT):e;
+
+/* ---------- maths ---------- */
+const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
+function cov(a,b){const ma=mean(a),mb=mean(b);let s=0;for(let i=0;i<a.length;i++)s+=(a[i]-ma)*(b[i]-mb);return s/(a.length-1)}
+function align(syms,y){
+  const ser=syms.map(s=>adjusted(store[s])),maps=ser.map(r=>new Map(r));
+  const end=ser.map(r=>r.at(-1)[0]).reduce((a,b)=>a<b?a:b),start=subYears(end,y);
+  const dates=ser[0].map(r=>r[0]).filter(d=>d>=start&&d<=end&&maps.every(m=>m.has(d)));
+  const px=maps.map(m=>dates.map(d=>m.get(d)));
+  return {dates,px,ret:px.map(p=>p.slice(1).map((v,i)=>v/p[i]-1)),start,end,short:dates.length>1&&dates[0]>addDays(start,10)};
+}
+/* each stock keeps its own history inside the period (a stock listed later is not cut out and does not cut the others) */
+function alignEach(syms,y){
+  const ser=syms.map(s=>adjusted(store[s]));
+  const end=ser.map(r=>r.at(-1)[0]).reduce((a,b)=>a<b?a:b),start=subYears(end,y);
+  const pd=[],px=[],ret=[],rd=[];
+  ser.forEach(r=>{const z=r.filter(x=>x[0]>=start&&x[0]<=end);pd.push(z.map(x=>x[0]));px.push(z.map(x=>x[1]));
+    ret.push(z.slice(1).map((x,i)=>x[1]/z[i][1]-1));rd.push(z.slice(1).map(x=>x[0]))});
+  const li=pd.reduce((b,d,i)=>d.length>pd[b].length?i:b,0),dates=pd[li];
+  const first=ser.map(r=>r[0][0]).reduce((a,b)=>a<b?a:b),from=first>start?first:start;
+  const late=syms.map((s,i)=>pd[i].length&&pd[i][0]>addDays(from,10)?i:-1).filter(i=>i>=0);
+  return {syms,dates,pd,px,ret,rd,start,end,late,short:dates.length>1&&dates[0]>addDays(start,10)};
+}
+/* covariance on the days both series have */
+function pairCov(ra,da,rb,db){
+  if(da===db||(da.length===db.length&&da[0]===db[0]&&da.at(-1)===db.at(-1)))return {c:cov(ra,rb),va:cov(ra,ra),vb:cov(rb,rb),n:ra.length};
+  const mb=new Map(db.map((d,i)=>[d,rb[i]])),a=[],b=[];
+  da.forEach((d,i)=>{if(mb.has(d)){a.push(ra[i]);b.push(mb.get(d))}});
+  return a.length>2?{c:cov(a,b),va:cov(a,a),vb:cov(b,b),n:a.length}:{c:0,va:1,vb:1,n:a.length};
+}
+/* symmetric eigen-decomposition (Jacobi), used to keep a pairwise covariance matrix valid */
+function eigSym(M){
+  const n=M.length,a=M.map(r=>r.slice()),V=M.map((_,i)=>M.map((_,j)=>i===j?1:0));
+  for(let sw=0;sw<60;sw++){let off=0;for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)off+=a[i][j]*a[i][j];if(off<1e-30)break;
+    for(let p=0;p<n;p++)for(let q=p+1;q<n;q++){if(Math.abs(a[p][q])<1e-300)continue;
+      const th=(a[q][q]-a[p][p])/(2*a[p][q]),t=Math.sign(th||1)/(Math.abs(th)+Math.sqrt(th*th+1)),c=1/Math.sqrt(t*t+1),s=t*c;
+      for(let k=0;k<n;k++){const x=a[k][p],y=a[k][q];a[k][p]=c*x-s*y;a[k][q]=s*x+c*y}
+      for(let k=0;k<n;k++){const x=a[p][k],y=a[q][k];a[p][k]=c*x-s*y;a[q][k]=s*x+c*y}
+      for(let k=0;k<n;k++){const x=V[k][p],y=V[k][q];V[k][p]=c*x-s*y;V[k][q]=s*x+c*y}}}
+  return {val:a.map((r,i)=>r[i]),V};
+}
+function fixCorr(R){
+  const n=R.length,{val,V}=eigSym(R);if(Math.min(...val)>1e-8)return R;
+  const L=val.map(x=>Math.max(x,1e-6)),B=R.map((_,i)=>R.map((_,j)=>{let s=0;for(let k=0;k<n;k++)s+=V[i][k]*L[k]*V[j][k];return s}));
+  return B.map((r,i)=>r.map((x,j)=>x/Math.sqrt(B[i][i]*B[j][j])));
+}
+function stats(p,r,dates){
+  const m=mean(r),v=cov(r,r),sd=Math.sqrt(v),days=(Date.parse(dates.at(-1))-Date.parse(dates[0]))/864e5;
+  let peak=p[0],mdd=0;for(const x of p){if(x>peak)peak=x;mdd=Math.min(mdd,x/peak-1)}
+  let best=-1,worst=1,bi=0,wi=0;r.forEach((x,i)=>{if(x>best){best=x;bi=i}if(x<worst){worst=x;wi=i}});
+  return {first:p[0],last:p.at(-1),pr:p.at(-1)/p[0]-1,cagr:Math.pow(p.at(-1)/p[0],365.25/days)-1,m,v,sd,ar:m*TD,ak:sd*Math.sqrt(TD),best,worst,bd:dates[bi+1],wd:dates[wi+1],up:r.filter(x=>x>0).length,down:r.filter(x=>x<0).length,n:r.length,mdd,years:days/365.25};
+}
+function portfolio(A,w){
+  const k=w.length,pd=A.pd||A.px.map(()=>A.dates),rd=A.rd||A.px.map(()=>A.dates.slice(1));
+  const S=A.ret.map((r,i)=>stats(A.px[i],r,pd[i]));
+  const O=A.ret.map((a,i)=>A.ret.map((b,j)=>i===j?{n:a.length}:pairCov(a,rd[i],b,rd[j])));
+  let R=A.ret.map((_,i)=>A.ret.map((_,j)=>i===j?1:(O[i][j].n>=20&&O[i][j].va>0&&O[i][j].vb>0?O[i][j].c/Math.sqrt(O[i][j].va*O[i][j].vb):0)));
+  const mixed=A.pd&&A.late&&A.late.length>0;if(mixed&&k>2)R=fixCorr(R);
+  const C=R.map((r,i)=>r.map((x,j)=>x*Math.sqrt(S[i].v*S[j].v)));
+  let v=0,diag=0;const mc=w.map((_,i)=>w.reduce((s,wj,j)=>s+wj*C[i][j],0));
+  for(let i=0;i<k;i++){v+=w[i]*mc[i];diag+=w[i]*w[i]*C[i][i]}
+  const ret=w.reduce((s,x,i)=>s+x*S[i].ar,0),risk=Math.sqrt(v*TD),wavg=w.reduce((s,x,i)=>s+x*S[i].ak,0);
+  return {S,C,corr:R,over:O,ret,risk,v:v*TD,diag:diag*TD,covp:(v-diag)*TD,wavg,contrib:w.map((x,i)=>x*mc[i]/v)};
+}
+
+/* ---------- charts ---------- */
+function axes(W,H,m,x0,x1,y0,y1,fx,fy){
+  const X=v=>m.l+(v-x0)/(x1-x0)*(W-m.l-m.r),Y=v=>H-m.b-(v-y0)/(y1-y0)*(H-m.t-m.b);
+  const ticks=(a,b,n)=>{const st=Math.pow(10,Math.floor(Math.log10((b-a)/n)));const s=[1,2,2.5,5,10].map(z=>z*st).find(z=>(b-a)/z<=n);const out=[];for(let v=Math.ceil(a/s)*s;v<=b+1e-12;v+=s)out.push(v);return out};
+  const nt=W<520?3:6;let g="";
+  for(const t of ticks(y0,y1,5))g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--rule)"/><text x="${m.l-8}" y="${Y(t)+4}" text-anchor="end">${fy(t)}</text>`;
+  for(const t of ticks(x0,x1,nt))g+=`<text x="${X(t)}" y="${H-m.b+18}" text-anchor="middle">${fx(t)}</text>`;
+  return {X,Y,g};
+}
+const pad=(a,b,f=.12)=>{const d=(b-a)||Math.abs(a)||.01;return [a-d*f,b+d*f]};
+function draw(el,fn){const s=el.querySelector("svg");const go=()=>{if(s.clientWidth)s.innerHTML=fn(s.clientWidth,s.clientHeight)};go();const ro=new ResizeObserver(go);ro.observe(s)}
+function scatter(W,H,pts,curve,line){
+  const m={l:56,r:24,t:18,b:42},all=[...pts,...(curve||[])];
+  let [x0,x1]=pad(Math.min(...all.map(p=>p.x)),Math.max(...all.map(p=>p.x)));x0=Math.max(0,x0);
+  let [y0,y1]=pad(Math.min(0,...all.map(p=>p.y)),Math.max(0,...all.map(p=>p.y)));
+  const a=axes(W,H,m,x0,x1,y0,y1,t=>pct(t,0),t=>pct(t,0));let g=a.g;
+  g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${a.Y(0)}" y2="${a.Y(0)}" stroke="var(--mute)"/>`;
+  g+=`<text x="${W-m.r}" y="${H-6}" text-anchor="end">Risk (annual SD) →</text><text x="${m.l}" y="12">↑ Annual return</text>`;
+  if(line)g+=`<line x1="${a.X(Math.max(x0,line[0].x))}" y1="${a.Y(line[0].y+(line[1].y-line[0].y)*(Math.max(x0,line[0].x)-line[0].x)/(line[1].x-line[0].x))}" x2="${a.X(Math.min(x1,line[1].x))}" y2="${a.Y(line[0].y+(line[1].y-line[0].y)*(Math.min(x1,line[1].x)-line[0].x)/(line[1].x-line[0].x))}" stroke="var(--ink)" stroke-dasharray="5 5" stroke-opacity=".6"/>`;
+  if(curve)g+=`<polyline fill="none" stroke="var(--teal)" stroke-width="2.5" stroke-opacity=".45" points="${curve.map(p=>a.X(p.x)+","+a.Y(p.y)).join(" ")}"/>`;
+  const placed=[],free=(x0b,y0b,wb)=>!placed.some(b=>x0b<b[0]+b[2]&&b[0]<x0b+wb&&Math.abs(y0b-b[1])<15);
+  const order=pts.map((p,i)=>i).sort((i,j)=>(pts[j].main?2:pts[j].label?1:0)-(pts[i].main?2:pts[i].label?1:0));
+  const lab={};
+  for(const i of order){const p=pts[i];if(!p.label)continue;const X=a.X(p.x),Y=a.Y(p.y),left=X>W*.7,wb=p.label.length*7.6+4;
+    for(const dy of [0,16,-16,30,-30]){const lx=left?X-14-wb:X+14;if(free(lx,Y+dy,wb)){placed.push([lx,Y+dy,wb]);lab[i]=[left?X-14:X+14,Y+dy+4,left];break}}}
+  pts.forEach((p,i)=>{const X=a.X(p.x),Y=a.Y(p.y);
+    g+=p.main?`<circle class="ring" cx="${X}" cy="${Y}" r="11" fill="var(--teal)" fill-opacity=".18" stroke="var(--teal)" stroke-width="3"/>`
+      :`<circle cx="${X}" cy="${Y}" r="${p.small?4:6}" fill="${p.min?"var(--bg)":"var(--ink)"}" stroke="var(--ink)" stroke-width="${p.min?2:0}"/>`;
+    if(lab[i])g+=`<text class="lbl" x="${lab[i][0]}" y="${lab[i][1]}" text-anchor="${lab[i][2]?"end":"start"}">${esc(p.label)}</text>`});
+  return g;
+}
+function lineChart(W,H,dates,p){
+  const m={l:62,r:18,t:16,b:34},[y0,y1]=pad(Math.min(...p),Math.max(...p),.06),n=p.length-1;
+  const X=i=>m.l+i/n*(W-m.l-m.r),Y=v=>H-m.b-(v-y0)/(y1-y0)*(H-m.t-m.b);
+  let g="";const st=(y1-y0)/4;for(let k=0;k<=4;k++){const v=y0+st*k;g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--rule)"/><text x="${m.l-8}" y="${Y(v)+4}" text-anchor="end">${num(v,0)}</text>`}
+  const nt=W<520?3:5;for(let k=0;k<nt;k++){const i=Math.round(k/(nt-1)*n);g+=`<text x="${X(i)}" y="${H-10}" text-anchor="${k===0?"start":k===nt-1?"end":"middle"}">${fmtD(dates[i]).slice(3)}</text>`}
+  const pts=p.map((v,i)=>X(i)+","+Y(v)).join(" ");
+  g+=`<polygon points="${m.l},${H-m.b} ${pts} ${X(n)},${H-m.b}" fill="var(--tealbg)"/><polyline points="${pts}" fill="none" stroke="var(--teal)" stroke-width="2"/>`;
+  g+=`<circle cx="${X(n)}" cy="${Y(p[n])}" r="5" fill="var(--teal)"/><text class="lbl" x="${X(n)-8}" y="${Y(p[n])-10}" text-anchor="end">₹${num(p[n])}</text>`;
+  return g;
+}
+
+
+
+/* ---------- picker ---------- */
+let pickCb=null;
+function pick(title,cb,taken){
+  pickCb=cb;$("#ptitle").textContent=title;$("#pq").value="";drawList(taken||[]);
+  const d=$("#pick");d.dataset.taken=JSON.stringify(taken||[]);
+  if(typeof d.showModal==="function")d.showModal();else d.setAttribute("open","");
+  setTimeout(()=>$("#pq").focus(),50);
+}
+function drawList(taken){
+  const q=$("#pq").value.trim().toLowerCase();
+  const score=x=>{const s=x.sym.toLowerCase(),n=x.name.toLowerCase();return s===q?0:s.startsWith(q)?1:n.startsWith(q)?2:x.n5?3:4};
+  let rows=LIST.filter(x=>!q||x.sym.toLowerCase().includes(q)||x.name.toLowerCase().includes(q));
+  if(q)rows.sort((a,b)=>score(a)-score(b));else rows=rows.filter(x=>x.n5||!LIST.some(y=>y.n5));
+  const more=rows.length>150;rows=rows.slice(0,150);
+  $("#plist").innerHTML=(rows.length?rows.map(x=>`<button type="button" data-s="${esc(x.sym)}" ${taken.includes(x.sym)?"disabled":""}><span><b>${esc(x.sym)}</b>${esc(x.name)}</span><span class="px">${EDU_CUT?"":`₹${num(x.last)}<br><span class="${cls(x.chg||0)}">${x.chg==null?"":pct(x.chg,1)}</span>`}</span></button>`).join("")
+    :`<p class="note" style="padding:12px">No stock matches “${esc(q)}”.</p>`)+(more||!q?`<p class="note" style="padding:8px 12px">${q?"Showing the first 150 matches. Type more letters to narrow.":`Showing Nifty 500 stocks. Type a name or symbol to search all ${LIST.length} NSE stocks.`}</p>`:"");
+}
+$("#pq").addEventListener("input",()=>drawList(JSON.parse($("#pick").dataset.taken||"[]")));
+$("#plist").addEventListener("click",ev=>{const b=ev.target.closest("button[data-s]");if(!b)return;closePick();if(pickCb)pickCb(b.dataset.s)});
+const closePick=()=>{const d=$("#pick");if(typeof d.close==="function"&&d.open)d.close();else d.removeAttribute("open")};
+$("#pclose").onclick=closePick;
+const pickLabel=(el,s)=>{el.innerHTML=`<span>${esc(s)}<small>${esc(nm(s))}</small></span>`};
+
+/* ---------- views ---------- */
+function status(){
+  const s=$("#status");
+  if(EDU_CUT){s.innerHTML=`<b>Education mode</b> · ${LIST.length} NSE stocks · data up to ${esc(fmtD(EDU_CUT))} (SEBI 30-day rule) · <button class="add" id="eduOff" type="button" style="padding:0 8px">Turn off</button>`;$("#eduOff").onclick=()=>setEdu(false);return}
+  if(sample){s.innerHTML="<b>Sample data</b> · TCS, INFY, HDFCBANK to 23 Nov 2026";return}
+  const last=LIST.map(x=>x.date).sort().at(-1);
+  const nse=meta&&meta.nse_date?` · official NSE close for ${esc(fmtD(meta.nse_date))}`:"";
+  if(LIVE){const tm=new Date(LIVE.t).toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",timeZone:"Asia/Kolkata"}),nf=LIVE.nifty?` · Nifty 50 ${num(LIVE.nifty[0],0)} <span class="${cls(LIVE.nifty[1])}">${LIVE.nifty[1]>=0?"+":""}${pct(LIVE.nifty[1],2)}</span>`:"";
+    s.innerHTML=`<b>${LIST.length} NSE stocks</b> · <b>market prices at ${esc(tm)}</b> (about 15 min delayed, refresh every 15 min)${nf} · risk and return use daily closes`;return}
+  s.innerHTML=`<b>${LIST.length} NSE stocks</b> · prices to ${esc(fmtD(last))}${nse} · updated every weekday evening`;
+}
+function setEdu(on){state.edu=!!on;try{localStorage.setItem("rrlab:state",JSON.stringify(state))}catch(e){}location.reload()}
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem("rrlab:state",JSON.stringify(state))}catch(e){}},400);cloudSave()}
+function needs(syms,box,go){
+  const t=++token;
+  box.innerHTML=`<p class="load">Loading prices for ${esc(syms.join(", "))}…</p>`;
+  Promise.allSettled(syms.map(ensure)).then(res=>{
+    if(t!==token)return;
+    const bad=res.map((r,i)=>r.status==="rejected"?(r.reason&&r.reason.message||syms[i]+": failed"):null).filter(Boolean);
+    const ok=syms.filter((s,i)=>res[i].status==="fulfilled"&&store[s]&&adjusted(store[s]).length>1);
+    if(EDU_CUT)syms.forEach((s,i)=>{if(res[i].status==="fulfilled"&&store[s]&&adjusted(store[s]).length<=1&&s!==IDX)bad.push(s+" has no prices older than 30 days, so education mode leaves it out.")});
+    try{go(ok,bad)}catch(err){box.innerHTML=`<p class="err">${esc(err.message)}</p>`}
+  });
+}
+const lateNote=A=>{
+  const L=(A.late||[]).map(i=>`<b>${esc(A.syms[i])}</b> from ${fmtD(A.pd[i][0])}`);
+  const adj=(A.syms||[]).filter(s=>STOCKS[s]&&STOCKS[s].adj);
+  return (L.length?`<p class="note">Shorter history: ${L.join(", ")} (listed or demerged later). Each of these uses its own available days for return and risk, and the days it shares with each other stock for correlation. All other stocks use the full ${state.period} year${state.period>1?"s":""}.</p>`:"")
+    +(adj.length?`<p class="note">Prices of ${adj.map(esc).join(", ")} are adjusted for a demerger or a large corporate action, so that day is not counted as a loss.</p>`:"");
+};
+const shortNote=A=>A.late?lateNote(A):A.short?`<p class="note">Only ${((A.dates.length-1)/TD).toFixed(1)} years of shared data are available, so this uses ${fmtD(A.dates[0])} to ${fmtD(A.dates.at(-1))}.</p>`:"";
+const errs=bad=>bad.length?`<p class="err">${bad.map(esc).join("<br>")}</p>`:"";
+const banner=()=>sample?`<p class="banner">Showing saved sample data. The full stock list loads when the site runs from GitHub Pages.</p>`:"";
+
+
+/* ---------- amount to invest → whole shares ---------- */
+function priceNow(s){return LIVE&&LIVE.p[s]&&!EDU_CUT?LIVE.p[s][0]:store[s]?(rawUpto(store[s]).at(-1)||[0,NaN])[1]:(STOCKS[s]?STOCKS[s].last:NaN)}
+function splitAmount(){
+  const amt=parseFloat(String($("#amtIn").value).replace(/,/g,"")),how=$("#amtHow").value,H=state.holdings.filter(h=>STOCKS[h.sym]);
+  if(!(amt>0)||!H.length){$("#amtRes").innerHTML=`<p class="note">Type an amount and add at least one stock.</p>`;return}
+  state.amt=amt;state.amtHow=how;save();
+  Promise.allSettled(H.map(h=>ensure(h.sym))).then(()=>{
+    const wsum=H.reduce((a,h)=>a+Math.max(0,+h.wt||0),0),tw=H.map(h=>how==="wt"&&wsum>0?Math.max(0,+h.wt||0)/wsum:1/H.length);
+    const px=H.map(h=>priceNow(h.sym)),q=H.map((h,i)=>px[i]>0?Math.floor(amt*tw[i]/px[i]):0);
+    let cash=amt-q.reduce((a,x,i)=>a+x*px[i],0);
+    for(let guard=0;guard<10000;guard++){ // spend what is left on the stock furthest below its target, one share at a time
+      let best=-1,gap=0;H.forEach((h,i)=>{const g=amt*tw[i]-q[i]*px[i];if(px[i]>0&&px[i]<=cash&&g>gap){gap=g;best=i}});
+      if(best<0)break;q[best]++;cash-=px[best];
+    }
+    const inv=amt-cash;
+    $("#amtRes").innerHTML=`<div class="scroll"><table><thead><tr><th>Stock</th><th class="n">Price ₹</th><th class="n">Target</th><th class="n">Shares</th><th class="n">Cost ₹</th><th class="n">Weight</th></tr></thead><tbody>${
+      H.map((h,i)=>`<tr><td><b>${esc(h.sym)}</b></td><td class="n">${num(px[i])}</td><td class="n">${pct(tw[i],1)}</td><td class="n"><b>${q[i]}</b></td><td class="n">${num(q[i]*px[i],0)}</td><td class="n">${inv>0?pct(q[i]*px[i]/inv,1):"–"}</td></tr>`).join("")}
+      <tr><td><b>Total</b></td><td></td><td></td><td></td><td class="n"><b>${num(inv,0)}</b></td><td></td></tr></tbody></table></div>
+      <p class="note">Cash left: <b>₹${num(cash,0)}</b>. Whole shares only, so weights are close to the target but not exact. ${q.some(x=>x===0)?"<b>Some stocks cost more than their share of the amount; raise the amount or split by weight.</b> ":""}Prices: ${LIVE&&!EDU_CUT?"latest market prices (about 15 minutes delayed)":"latest closing prices"}. Brokerage and taxes not included.</p>
+      <button class="btn" id="amtUse" type="button">Use these quantities</button>`;
+    $("#amtUse").onclick=()=>{H.forEach((h,i)=>{h.qty=q[i];h.buy=Math.round(px[i]*100)/100});state.mode="qty";save();document.getElementsByName("mode").forEach(r=>r.checked=r.value==="qty");renderPortfolio();toast("Quantities and buy prices filled in")};
+  });
+}
+function viewPortfolio(){
+  $("#amtIn").value=state.amt||"";$("#amtHow").value=state.amtHow||"eq";$("#amtGo").onclick=splitAmount;
+  $("#benchBox").innerHTML=hasIdx()?benchSel():"";
+  document.getElementsByName("mode").forEach(r=>{r.checked=r.value===state.mode;r.onchange=()=>{state.mode=r.value;save();renderPortfolio()}});
+  $("#addBtn").onclick=()=>pick("Add a stock",s=>{state.holdings.push({sym:s,qty:10,buy:0,wt:10});save();renderPortfolio()},state.holdings.map(h=>h.sym));
+  renderPortfolio();
+}
+function renderPortfolio(){
+  const H=state.holdings,q=state.mode==="qty";
+  const last=s=>EDU_CUT?(store[s]?(rawUpto(store[s]).at(-1)||[0,NaN])[1]:NaN):LIVE&&LIVE.p[s]?LIVE.p[s][0]:store[s]?store[s].at(-1)[1]:(STOCKS[s]?STOCKS[s].last:NaN);
+  const val=H.map(h=>STOCKS[h.sym]?(q?h.qty*last(h.sym):Math.max(0,+h.wt||0)):0),tot=val.reduce((a,b)=>a+(Number.isFinite(b)?b:0),0);
+  $("#hold").innerHTML=H.map((h,i)=>`<div class="h"><div class="hh"><b>${esc(h.sym)}</b><span class="nm">${esc(nm(h.sym))}</span><button class="rm" data-del="${i}" aria-label="Remove ${esc(h.sym)}">Remove</button></div>
+    ${STOCKS[h.sym]?`<div class="hf">${q?`<label>Quantity<input data-i="${i}" data-k="qty" inputmode="decimal" value="${esc(h.qty)}"></label><label>Buy price ₹<input data-i="${i}" data-k="buy" inputmode="decimal" value="${esc(h.buy||"")}" placeholder="optional"></label><span class="kv">Last ₹<b>${num(last(h.sym))}</b></span><span class="kv">Value ₹<b>${num(val[i],0)}</b></span>`
+      :`<label>Weight %<input data-i="${i}" data-k="wt" inputmode="decimal" value="${esc(h.wt??10)}"></label>`}<span class="kv">Share<b>${pct(val[i]/tot,1)}</b></span></div>`
+      :`<p class="warn">Not in the stock list. Remove it and add it again from the list.</p>`}</div>`).join("")||`<p class="note">No stocks yet. Tap “Add a stock”.</p>`;
+  if(q&&H.length)$("#hold").insertAdjacentHTML("beforeend",`<p class="note" style="margin:0 0 10px">Total value <b>₹${num(tot,0)}</b></p>`);
+  $("#hold").querySelectorAll("input").forEach(inp=>inp.onchange=()=>{const h=H[+inp.dataset.i];h[inp.dataset.k]=Math.max(0,parseFloat(inp.value)||0);save();renderPortfolio()});
+  $("#hold").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{H.splice(+b.dataset.del,1);save();renderPortfolio()});
+  const syms=H.map(h=>h.sym).filter(s=>STOCKS[s]);
+  if(!syms.length){$("#pres").innerHTML=banner()+`<p class="load">Add stocks to see your portfolio's risk and return.</p>`;$("#pdetail").innerHTML="";return}
+  needs(hasIdx()?syms.concat(IDX):syms,$("#pres"),(ok,bad0)=>{
+    const bad=bad0.filter(b=>!b.startsWith(IDX)),withIdx=ok.includes(IDX);
+    const use0=H.filter(h=>ok.includes(h.sym));
+    if(!use0.length){$("#pres").innerHTML=errs(bad);$("#pdetail").innerHTML="";return}
+    let AA=alignEach(withIdx?[...use0.map(h=>h.sym),IDX]:use0.map(h=>h.sym),state.period);
+    const tiny=use0.filter((h,i)=>AA.pd[i].length<21),use=use0.filter(h=>!tiny.includes(h)),k=use.length;
+    if(tiny.length){bad.push(...tiny.map(h=>`${h.sym} is left out: fewer than 20 trading days of prices so far.`));AA=alignEach(withIdx?[...use.map(h=>h.sym),IDX]:use.map(h=>h.sym),state.period)}
+    if(!k){$("#pres").innerHTML=errs(bad);$("#pdetail").innerHTML="";return}
+    const A={...AA,syms:AA.syms.slice(0,k),pd:AA.pd.slice(0,k),rd:AA.rd.slice(0,k),px:AA.px.slice(0,k),ret:AA.ret.slice(0,k),late:AA.late.filter(i=>i<k)};
+    const mret=withIdx?AA.ret[k]:null,mrd=withIdx?AA.rd[k]:null,mS=withIdx?stats(AA.px[k],mret,AA.pd[k]):null;
+    const lp=A.px.map(p=>p.at(-1)),v=use.map((h,i)=>q?h.qty*lp[i]:Math.max(0,+h.wt||0)),t=v.reduce((a,b)=>a+b,0);
+    if(!(t>0)){$("#pres").innerHTML=`<p class="load">Enter a quantity or weight above zero.</p>`;$("#pdetail").innerHTML="";return}
+    const w=v.map(x=>x/t),P=portfolio(A,w),rf=state.rf;
+    const beta=A.ret.map((r,i)=>{if(!mret)return NaN;const o=pairCov(r,A.rd[i],mret,mrd);return o.n>=20?o.c/o.vb:NaN}),pb=w.reduce((s,x,i)=>s+x*beta[i],0),psh=(P.ret-rf)/P.risk;
+    const inv=q?use.reduce((s,h)=>s+(h.buy>0?h.qty*h.buy:0),0):0,cur=q?use.reduce((s,h,i)=>s+(h.buy>0?h.qty*lp[i]:0),0):0;
+    $("#pres").innerHTML=banner()+errs(bad)+`<div class="figs">
+      <div class="fig1"><div class="lab">Portfolio risk a year ${tip("risk")}</div><div class="big">${pct(P.risk,1)}</div></div>
+      <div class="fig1"><div class="lab">Portfolio return a year ${tip("ret")}</div><div class="big ${cls(P.ret)}">${pct(P.ret,1)}</div></div>
+      <div class="fig1"><div class="lab">Sharpe ratio ${tip("sharpe")}</div><div class="mid ${cls(psh)}">${fx(psh)}</div><div class="lab">risk-free ${pct(rf,1)}</div></div>
+      <div class="fig1"><div class="lab">Beta vs ${BN()} ${tip("beta")}</div><div class="mid">${Number.isFinite(pb)?pb.toFixed(2):"–"}</div><div class="lab">${Number.isFinite(pb)?(pb>1.1?"moves more than the market":pb<.9?"moves less than the market":"moves like the market"):"Nifty data not loaded"}</div></div>
+      <div class="fig1"><div class="lab">Risk cut by mixing ${tip("cut")}</div><div class="mid">${pct(P.wavg-P.risk,1)}</div><div class="lab">from ${pct(P.wavg,1)}</div></div>
+      ${inv>0?`<div class="fig1"><div class="lab">Gain on your cost ${tip("gain")}</div><div class="mid ${cls(cur-inv)}">${rs(cur-inv)}</div><div class="lab">${pct(cur/inv-1,1)} on ₹${num(inv,0)}</div></div>`:""}
+    </div><div class="panel"><div class="fig" id="pfig"><svg role="img" aria-label="Risk versus return of each stock, the portfolio and ${BN()}"></svg></div>
+    <p class="note">Each dot is a stock; the ring is your portfolio${mS?"; the hollow dot is "+BN():""}. Higher is more return, further right is more risk. ${A.dates.length-1} daily returns, ${fmtD(A.dates[0])} to ${fmtD(A.dates.at(-1))}.</p></div>`+shortNote(A);
+    draw($("#pfig"),(W,Hh)=>scatter(W,Hh,[...P.S.map((s,i)=>({x:s.ak,y:s.ar,label:use[i].sym})),...(mS?[{x:mS.ak,y:mS.ar,label:BN().toUpperCase(),min:1}]:[]),{x:P.risk,y:P.ret,label:"Portfolio",main:1}]));
+    const heat=c=>`background:color-mix(in srgb,${c<0?"var(--red)":"var(--teal)"} ${Math.round(Math.abs(c)*70)}%,var(--bg))`;
+    const opt=k>1?optimise(A,P,use,w,beta):null;
+    lastExport={A,P,use,w,beta,pb,psh,mS,opt};
+    $("#pdetail").innerHTML=simpleHTML(A,P,use,w,beta,pb,psh,mS,q?t:0)+healthHTML(use,w,P)+allocHTML(use,w,q?t:0)+badDaysHTML(A,w,use,rf,q?t:0,mS)+expHTML(use,w,beta,P,mS,q?t:0)+mcHTML(P,pb,q?t:0)+(opt?opt.html:"")+attribHTML(use,w,P)+`<section><h2>Each stock</h2><div class="scroll"><table><thead><tr><th>Stock</th><th>Weight</th><th>Return</th><th>Risk</th><th>Sharpe</th><th class="hide-s">Beta</th><th>Risk share</th><th class="hide-s">Total return</th><th class="hide-s">CAGR</th></tr></thead><tbody>${
+      P.S.map((s,i)=>`<tr><td><b>${esc(use[i].sym)}</b></td><td class="n">${pct(w[i],1)}</td><td class="n ${cls(s.ar)}">${pct(s.ar,1)}</td><td class="n">${pct(s.ak,1)}</td><td class="n">${fx((s.ar-rf)/s.ak)}</td><td class="n hide-s">${Number.isFinite(beta[i])?beta[i].toFixed(2):"–"}</td><td class="n">${pct(P.contrib[i],1)}</td><td class="n hide-s ${cls(s.pr)}">${pct(s.pr,1)}</td><td class="n hide-s ${cls(s.cagr)}">${pct(s.cagr,1)}</td></tr>`).join("")}
+      ${mS?`<tr><td><i>${BN()}</i></td><td></td><td class="n ${cls(mS.ar)}">${pct(mS.ar,1)}</td><td class="n">${pct(mS.ak,1)}</td><td class="n">${fx((mS.ar-rf)/mS.ak)}</td><td class="n hide-s">1.00</td><td></td><td class="n hide-s ${cls(mS.pr)}">${pct(mS.pr,1)}</td><td class="n hide-s ${cls(mS.cagr)}">${pct(mS.cagr,1)}</td></tr>`:""}</tbody></table></div>
+      <p class="note">Sharpe = (return − risk-free rate) ÷ risk; higher is better. Beta above 1 moves more than ${BN()}, below 1 moves less. Risk share: how much of the portfolio's risk comes from each stock.</p></section>
+      ${k>1?`<section><h2>Correlation ${tip("corr")}</h2><div class="scroll"><table style="width:auto"><thead><tr><th></th>${use.map(h=>`<th>${esc(h.sym)}</th>`).join("")}</tr></thead><tbody>${
+        P.corr.map((r,i)=>`<tr><td><b>${esc(use[i].sym)}</b></td>${r.map((c,j)=>`<td class="n" style="${i===j?"":heat(c)}">${c.toFixed(2)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+        <p class="note">Near +1: they move together. Near 0 or below: they offset each other and lower risk.</p></section>`:""}
+      <details><summary>See the step-by-step calculation</summary><div class="scroll"><table class="steps"><tbody>
+        <tr><td>Return = Σ weight × annual return</td><td class="n">${pct(P.ret,2)}</td></tr>
+        <tr><td>Own-risk part: Σ w² × σ²</td><td class="n">${P.diag.toFixed(4)}</td></tr>
+        <tr><td>Covariance part: 2 × wᵢ × wⱼ × Covᵢⱼ over ${k*(k-1)/2} pairs</td><td class="n">${P.covp.toFixed(4)}</td></tr>
+        <tr><td>Portfolio variance</td><td class="n">${P.v.toFixed(4)}</td></tr>
+        <tr><td><b>Portfolio risk = √variance</b></td><td class="n"><b>${pct(P.risk,2)}</b></td></tr>
+        <tr><td>Weighted average of stock risks (if every ρ were 1)</td><td class="n">${pct(P.wavg,2)}</td></tr>
+        <tr><td>Sharpe = (${pct(P.ret,2)} − ${pct(rf,2)}) ÷ ${pct(P.risk,2)}</td><td class="n">${psh.toFixed(3)}</td></tr>
+        <tr><td>Beta = Σ weight × stock beta</td><td class="n">${Number.isFinite(pb)?pb.toFixed(3):"–"}</td></tr>
+      </tbody></table></div></details>
+      <p style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost" id="csvBtn" type="button">Download results for Excel (CSV)</button><button class="btn ghost" type="button" onclick="window.print()">Print / save as PDF</button></p>`;
+    if(opt)opt.after();bindExp();bindMC(P,pb,q?t:0);
+    $("#csvBtn").onclick=downloadCSV;
+  });
+}
+
+/* ---------- risk on bad days: VaR, CVaR, drawdown, Sortino, COVID stress test ---------- */
+function portSeries(A,w){
+  // daily portfolio return on each day of the period; a stock without a price that day is left out and the rest re-weighted
+  const maps=A.ret.map((r,i)=>new Map(A.rd[i].map((d,j)=>[d,r[j]]))),days=A.dates.slice(1),out=[];
+  for(const d of days){let s=0,ws=0;maps.forEach((m,i)=>{if(m.has(d)){s+=w[i]*m.get(d);ws+=w[i]}});if(ws>0)out.push([d,s/ws])}
+  return out;
+}
+function tailRisk(r,rf){
+  const x=r.slice().sort((a,b)=>a-b),n=x.length,k=Math.max(1,Math.floor(n*.05));
+  const var95=-x[k-1],cvar=-x.slice(0,k).reduce((a,b)=>a+b,0)/k,m=mean(r);
+  const dd=Math.sqrt(r.reduce((s,v)=>s+Math.min(0,v-rf/TD)**2,0)/n)*Math.sqrt(TD);
+  let v=1,peak=1,mdd=0;for(const z of r){v*=1+z;peak=Math.max(peak,v);mdd=Math.min(mdd,v/peak-1)}
+  let worstM=0;for(let i=21;i<=n;i++){let g=1;for(let j=i-21;j<i;j++)g*=1+r[j];worstM=Math.min(worstM,g-1)}
+  return {var95,cvar,sortino:(m*TD-rf)/dd,mdd,worstM,growth:v};
+}
+function covidReturn(sym){
+  const e=store[sym];if(!e)return NaN;const a=e.tr||e;
+  const p0=a.filter(x=>x[0]<="2020-02-19").at(-1),p1=a.filter(x=>x[0]<="2020-03-23").at(-1);
+  return p0&&p1&&p0[0]>="2020-02-10"&&p1[0]>="2020-03-16"?p1[1]/p0[1]-1:NaN;
+}
+function badDaysHTML(A,w,use,rf,val,mS){
+  const ps=portSeries(A,w);if(ps.length<60)return "";
+  const r=ps.map(x=>x[1]),T=tailRisk(r,rf),yrs=(Date.parse(ps.at(-1)[0])-Date.parse(A.dates[0]))/864e5/365.25,cagr=Math.pow(T.growth,1/yrs)-1;
+  const cv=use.map(h=>covidReturn(h.sym)),okc=cv.map((c,i)=>Number.isFinite(c)?i:-1).filter(i=>i>=0),wc=okc.reduce((s,i)=>s+w[i],0);
+  const pc=wc>0?okc.reduce((s,i)=>s+w[i]*cv[i],0)/wc:NaN,nc=covidReturn(IDX),miss=use.filter((h,i)=>!okc.includes(i)).map(h=>h.sym);
+  const rup=x=>val>0?` <span class="note">(₹${num(x*val,0)})</span>`:"";
+  const thin=use.filter(h=>STOCKS[h.sym]&&STOCKS[h.sym].tv!=null&&STOCKS[h.sym].tv<1).map(h=>h.sym);
+  return `<section style="margin-top:28px"><h2>Risk on bad days ${tip("var")}</h2><div class="scroll"><table class="steps"><tbody>
+    <tr><td>1-day VaR 95%: on 1 day in 20, you could lose at least</td><td class="n neg">${pct(T.var95,2)}${rup(T.var95)}</td></tr>
+    <tr><td>CVaR 95%: average loss on those worst 1-in-20 days</td><td class="n neg">${pct(T.cvar,2)}${rup(T.cvar)}</td></tr>
+    <tr><td>Worst month (21 trading days) in the period</td><td class="n neg">${pct(T.worstM,1)}</td></tr>
+    <tr><td>Biggest fall from a peak (max drawdown)</td><td class="n neg">${pct(T.mdd,1)}</td></tr>
+    <tr><td>Sortino ratio (counts only downside swings)</td><td class="n">${Number.isFinite(T.sortino)?fx(T.sortino):"–"}</td></tr>
+    <tr><td>Real growth rate (CAGR of the daily mix)</td><td class="n ${cls(cagr)}">${pct(cagr,1)}</td></tr>
+    <tr><td>COVID crash test (19 Feb – 23 Mar 2020)</td><td class="n neg">${Number.isFinite(pc)?pct(pc,1):"–"}${Number.isFinite(nc)?` <span class="note">${BN()}: ${pct(nc,1)}</span>`:""}</td></tr>
+  </tbody></table></div>
+  <p class="note">VaR and CVaR come from the period's actual daily returns (historical method), not from a bell curve. The COVID test applies your weights to each stock's real fall in 2020${miss.length?`; ${esc(miss.join(", "))} had no price then and are left out`:""}.</p>
+  ${thin.length?`<p class="warn">Hard to trade: ${esc(thin.join(", "))} trade${thin.length===1?"s":""} under ₹1 crore a day on average. Large orders can move the price.</p>`:""}</section>`;
+}
+
+/* ---------- your portfolio in simple words (rule-based report) ---------- */
+function simpleHTML(A,P,use,w,beta,pb,psh,mS,val){
+  const ps=portSeries(A,w);if(ps.length<30)return "";
+  const T=tailRisk(ps.map(x=>x[1]),state.rf),yrs=(Date.parse(ps.at(-1)[0])-Date.parse(A.dates[0]))/864e5/365.25,cagr=Math.pow(T.growth,1/yrs)-1;
+  const per=state.period,L=[],bn=BN(),imax=P.contrib.indexOf(Math.max(...P.contrib)),wmax=Math.max(...w),losers=use.filter((h,i)=>P.S[i].cagr<0).map(h=>h.sym);
+  const msh=mS?(mS.ar-state.rf)/mS.ak:NaN,secs={};use.forEach((h,i)=>{const c=sectorOf(h.sym);secs[c]=(secs[c]||0)+w[i]});const smax=Object.entries(secs).sort((a,b)=>b[1]-a[1])[0];
+  L.push(["How much it swings",`In a normal year your portfolio can be about <b>${pct(P.risk,0)}</b> better or worse than its average${mS?` (${esc(bn)}: ${pct(mS.ak,0)})`:""}. ${mS&&P.risk>1.5*mS.ak?"That is a lot more than the market.":mS&&P.risk<mS.ak?"That is calmer than the market.":"That is close to the market."}`]);
+  L.push(["What it earned",`Over the last ${per} year${per>1?"s":""} it grew <b>${pct(cagr,1)} a year</b>${mS?` while ${esc(bn)} grew ${pct(mS.cagr,1)} a year`:""}. ${mS?(cagr>mS.cagr?"You did better than the market.":"You did worse than the market."):""}`]);
+  if(Number.isFinite(pb))L.push(["Market risk",`Beta is <b>${pb.toFixed(2)}</b>: if ${esc(bn)} falls 10%, expect your portfolio to fall about <b>${pct(pb*.1,0)}</b>${pb>1.15?", so it is aggressive":pb<.85?", so it is defensive":""}.`]);
+  L.push(["Reward for the risk",`Sharpe ratio is <b>${fx(psh)}</b>${Number.isFinite(msh)?` (${esc(bn)}: ${fx(msh)})`:""}. ${psh<0?"You earned less than a fixed deposit (6.5%) in this period.":psh<.5?"The extra return over a fixed deposit was small for the risk taken.":psh<1?"An okay reward for the risk.":"A good reward for the risk."}`]);
+  L.push(["Diversification",`Mixing the stocks cut risk from ${pct(P.wavg,0)} to ${pct(P.risk,0)}. <b>${esc(use[imax].sym)}</b> brings ${pct(P.contrib[imax],0)} of the risk with ${pct(w[imax],0)} of the money.`]);
+  L.push(["A bad day",`On 1 day in 20 you could lose <b>${pct(T.var95,1)}</b> or more${val>0?` (₹${num(T.var95*val,0)} on ₹${num(val,0)})`:""}. The worst fall from a peak in this period was ${pct(T.mdd,0)}.`]);
+  const todo=[];
+  if(use.length<8)todo.push(`Hold more stocks: ${use.length} is few; 10 to 20 from different sectors spread risk well.`);
+  if(wmax>.2)todo.push(`Keep each stock under about 20%; the biggest is now ${pct(wmax,0)}.`);
+  if(smax&&smax[1]>.4&&use.length>1)todo.push(`${esc(smax[0])} is ${pct(smax[1],0)} of the money; spread across more sectors.`);
+  if(Number.isFinite(pb)&&pb>1.2)todo.push(`Add some low-beta stocks, debt or gold to bring beta closer to 1.`);
+  if(losers.length)todo.push(`Review ${esc(losers.join(", "))}: negative growth over this period.`);
+  return `<section class="simple"><h2>Your portfolio in simple words</h2>
+    <div class="simplegrid">${L.map(([h,t])=>`<div><b>${h}</b><p>${t}</p></div>`).join("")}</div>
+    ${todo.length?`<h3>Points to consider</h3><ul>${todo.map(x=>`<li>${x}</li>`).join("")}</ul>`:""}
+    <p class="note">Based on past prices for learning, not investment advice. <button class="add" type="button" onclick="window.print()">Print this report</button></p></section>`;
+}
+/* ---------- Monte Carlo: a range of possible futures ---------- */
+function rng(seed){return ()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function monteCarlo(mu,sd,years,amt,n=5000){
+  const r=rng(42),g=()=>{let u=0,v=0;while(!u)u=r();while(!v)v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+  const s2=Math.log(1+sd*sd/((1+mu)**2)),m=Math.log(1+mu)-s2/2,s=Math.sqrt(s2),paths=[];
+  for(let k=0;k<n;k++){let v=amt;const p=[v];for(let y=0;y<years;y++){v*=Math.exp(m+s*g());p.push(v)}paths.push(p)}
+  const q=(arr,f)=>{const a=arr.slice().sort((x,y)=>x-y);return a[Math.min(a.length-1,Math.floor(f*a.length))]};
+  const band=[...Array(years+1)].map((_,y)=>{const col=paths.map(p=>p[y]);return {y,p10:q(col,.1),p50:q(col,.5),p90:q(col,.9)}});
+  const fin=paths.map(p=>p[years]),fd=amt*Math.pow(1+state.rf,years);
+  return {band,loss:fin.filter(x=>x<amt).length/n,beatFD:fin.filter(x=>x>fd).length/n,fd};
+}
+function mcHTML(P,pb,val){
+  return `<section style="margin-top:28px"><h2>Possible futures (Monte Carlo) ${tip("mc")}</h2>
+    <div class="ctl"><label style="font-size:14px;display:grid;gap:2px">Amount ₹<input id="mcAmt" inputmode="decimal" value="${Math.round(val>0?val:(state.amt||100000))}"></label>
+    <label style="font-size:14px;display:grid;gap:2px">Years<input id="mcY" inputmode="numeric" value="${state.mcY||5}"></label>
+    <label style="font-size:14px;display:grid;gap:2px">Expected return from<select id="mcMu"><option value="capm" ${state.mcMu!=="past"?"selected":""} ${Number.isFinite(pb)?"":"disabled"}>CAPM (beta-based)</option><option value="past" ${state.mcMu==="past"||!Number.isFinite(pb)?"selected":""}>Past return of this period</option></select></label></div>
+    <div id="mcOut"></div></section>`;
+}
+function bindMC(P,pb,val){
+  const go=()=>{
+    const amt=parseFloat(String($("#mcAmt").value).replace(/,/g,""))||100000,yrs=Math.max(1,Math.min(30,Math.round(+$("#mcY").value||5)));
+    state.mcY=yrs;state.mcMu=$("#mcMu").value;save();
+    const erm=state.erm??ermDefault(),mu=state.mcMu==="capm"&&Number.isFinite(pb)?state.rf+pb*(erm-state.rf):P.ret,M=monteCarlo(mu,P.risk,yrs,amt),e=M.band.at(-1);
+    $("#mcOut").innerHTML=`<div class="figs"><div class="fig1"><div class="lab">Bad case (1 in 10 worse)</div><div class="mid ${cls(e.p10-amt)}">₹${num(e.p10,0)}</div></div>
+      <div class="fig1"><div class="lab">Typical (middle)</div><div class="mid">₹${num(e.p50,0)}</div></div>
+      <div class="fig1"><div class="lab">Good case (1 in 10 better)</div><div class="mid pos">₹${num(e.p90,0)}</div></div>
+      <div class="fig1"><div class="lab">Chance of ending below ₹${num(amt,0)}</div><div class="mid">${pct(M.loss,0)}</div></div>
+      <div class="fig1"><div class="lab">Chance of beating an FD at ${pct(state.rf,1)}</div><div class="mid">${pct(M.beatFD,0)}</div><div class="lab">FD gives ₹${num(M.fd,0)}</div></div></div>
+      <div class="panel"><div class="fig" id="mcfig"><svg role="img" aria-label="Range of possible portfolio values"></svg></div>
+      <p class="note">5,000 simulated futures with expected return ${pct(mu,1)} a year and risk ${pct(P.risk,1)} a year (lognormal, yearly steps). Shaded: 8 in 10 futures fall inside; line: the middle one. A range of possibilities, not a prediction.</p></div>`;
+    draw($("#mcfig"),(W,H)=>{const m={l:72,r:18,t:16,b:34},hi=Math.max(...M.band.map(b=>b.p90)),lo=Math.min(amt*.5,...M.band.map(b=>b.p10)),[y0,y1]=pad(lo,hi,.05),n=yrs;
+      const X=i=>m.l+i/n*(W-m.l-m.r),Y=v=>H-m.b-(v-y0)/(y1-y0)*(H-m.t-m.b);let g="";
+      for(let k=0;k<=4;k++){const v=y0+(y1-y0)*k/4;g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--rule)"/><text x="${m.l-8}" y="${Y(v)+4}" text-anchor="end">₹${num(v/1000,0)}k</text>`}
+      M.band.forEach(b=>{if(n<=10||b.y%Math.ceil(n/8)===0)g+=`<text x="${X(b.y)}" y="${H-10}" text-anchor="middle">${b.y}y</text>`});
+      g+=`<polygon fill="var(--tealbg)" points="${M.band.map(b=>X(b.y)+","+Y(b.p90)).join(" ")} ${M.band.slice().reverse().map(b=>X(b.y)+","+Y(b.p10)).join(" ")}"/>`;
+      g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(amt)}" y2="${Y(amt)}" stroke="var(--mute)" stroke-dasharray="4 4"/>`;
+      g+=`<polyline fill="none" stroke="var(--teal)" stroke-width="2.5" points="${M.band.map(b=>X(b.y)+","+Y(b.p50)).join(" ")}"/>`;
+      g+=`<text class="lbl" x="${X(n)-6}" y="${Y(e.p50)-8}" text-anchor="end">₹${num(e.p50,0)}</text>`;return g});
+  };
+  ["#mcAmt","#mcY","#mcMu"].forEach(id=>$(id).onchange=go);go();
+}
+/* ---------- where the return and risk came from (attribution) ---------- */
+function attribHTML(use,w,P){
+  if(use.length<2)return "";
+  const c=P.S.map((s,i)=>w[i]*s.ar),sec={};
+  use.forEach((h,i)=>{const k=sectorOf(h.sym);sec[k]=sec[k]||{w:0,c:0,r:0};sec[k].w+=w[i];sec[k].c+=c[i];sec[k].r+=P.contrib[i]});
+  const rows=Object.entries(sec).sort((a,b)=>b[1].c-a[1].c);
+  return `<section style="margin-top:28px"><h2>Where the return came from ${tip("contrib")}</h2><div class="grid2">
+    <div class="scroll"><table><thead><tr><th>Stock</th><th class="n">Weight</th><th class="n">Return</th><th class="n">Contribution</th><th class="n">Risk share</th></tr></thead><tbody>
+      ${use.map((h,i)=>[h,i]).sort((a,b)=>c[b[1]]-c[a[1]]).map(([h,i])=>`<tr><td><b>${esc(h.sym)}</b></td><td class="n">${pct(w[i],1)}</td><td class="n ${cls(P.S[i].ar)}">${pct(P.S[i].ar,1)}</td><td class="n ${cls(c[i])}"><b>${pct(c[i],1)}</b></td><td class="n">${pct(P.contrib[i],1)}</td></tr>`).join("")}
+      <tr><td><b>Portfolio</b></td><td class="n">100%</td><td></td><td class="n ${cls(P.ret)}"><b>${pct(P.ret,1)}</b></td><td class="n">100%</td></tr></tbody></table></div>
+    <div class="scroll"><table><thead><tr><th>Sector</th><th class="n">Weight</th><th class="n">Contribution</th><th class="n">Risk share</th></tr></thead><tbody>
+      ${rows.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${pct(v.w,1)}</td><td class="n ${cls(v.c)}">${pct(v.c,1)}</td><td class="n">${pct(v.r,1)}</td></tr>`).join("")}</tbody></table></div></div>
+    <p class="note">Contribution = weight × the stock's yearly return; the contributions add up to the portfolio's return. Compare each stock's contribution with its risk share: a stock that brings much more risk than return is a candidate to trim.</p></section>`;
+}
+/* ---------- expected return (CAPM) ---------- */
+function ermDefault(){const m=STOCKS[NIFTY]&&STOCKS[NIFTY].m&&STOCKS[NIFTY].m["10"];return m&&Number.isFinite(m[3])?Math.round(m[3]*1000)/1000:0.12}
+function expHTML(use,w,beta,P,mS,val){
+  const rf=state.rf,erm=state.erm??ermDefault(),ok=beta.every(Number.isFinite);
+  if(!ok)return `<section style="margin-top:28px"><h2>Expected return ${tip("capm")}</h2><p class="note">Needs ${BN()} data to calculate beta. It will appear after the next price update.</p></section>`;
+  const capm=beta.map(b=>rf+b*(erm-rf)),pb=w.reduce((s,x,i)=>s+x*beta[i],0),E=rf+pb*(erm-rf),sd=P.risk;
+  const rm=mS?mS.ar:NaN,alpha=P.S.map((s,i)=>s.ar-(rf+beta[i]*(rm-rf))),pa=P.ret-(rf+pb*(rm-rf)),treynor=(P.ret-rf)/pb;
+  const V=val>0?val:0,yrs=[1,3,5],lm=Math.log(1+E)-sd*sd/2;
+  const proj=n=>({mid:V*Math.pow(1+E,n),lo:V*Math.exp(lm*n-2*sd*Math.sqrt(n)),hi:V*Math.exp(lm*n+2*sd*Math.sqrt(n))});
+  return `<section style="margin-top:28px"><h2>Expected return ${tip("capm")}</h2>
+    <div class="ctl"><label style="font-size:14px;display:grid;gap:2px">Expected ${BN()} return % a year<input id="ermIn" inputmode="decimal" value="${(erm*100).toFixed(1)}"></label>
+      <label style="font-size:14px;display:grid;gap:2px">Risk-free rate % a year<input id="rf2In" inputmode="decimal" value="${(rf*100).toFixed(2)}"></label></div>
+    <div class="grid2"><div class="panel">
+      <div class="figs"><div class="fig1"><div class="lab">Expected return a year (CAPM) ${tip("capm")}</div><div class="big ${cls(E)}">${pct(E,1)}</div><div class="lab">${pct(rf,1)} + ${pb.toFixed(2)} × (${pct(erm,1)} − ${pct(rf,1)})</div></div>
+      <div class="fig1"><div class="lab">Likely range next year ${tip("range")}</div><div class="mid">${pct(E-sd,0)} to ${pct(E+sd,0)}</div><div class="lab">about 2 years in 3 (±1 SD of ${pct(sd,1)})</div></div>
+      <div class="fig1"><div class="lab">Wide range next year</div><div class="mid">${pct(E-2*sd,0)} to ${pct(E+2*sd,0)}</div><div class="lab">about 19 years in 20 (±2 SD)</div></div></div>
+      ${V>0?`<div class="scroll"><table><thead><tr><th>Your ₹${num(V,0)} after</th><th>Expected</th><th>Low (95%)</th><th>High (95%)</th></tr></thead><tbody>${yrs.map(n=>{const p=proj(n);return `<tr><td>${n} year${n>1?"s":""}</td><td class="n"><b>₹${num(p.mid,0)}</b></td><td class="n neg">₹${num(p.lo,0)}</td><td class="n pos">₹${num(p.hi,0)}</td></tr>`}).join("")}</tbody></table></div>`:""}
+      <p class="note">CAPM: expected return = risk-free rate + beta × (expected market return − risk-free rate). The expected Nifty return starts at ${BN()}'s 10-year CAGR from the data; change it to your own view. Ranges assume returns swing like the chosen period's risk.</p></div>
+    <div><div class="scroll"><table><thead><tr><th>Stock</th><th>Beta</th><th>Expected (CAPM)</th><th>Past return</th><th>Alpha</th></tr></thead><tbody>
+      ${use.map((h,i)=>`<tr><td><b>${esc(h.sym)}</b></td><td class="n">${beta[i].toFixed(2)}</td><td class="n ${cls(capm[i])}">${pct(capm[i],1)}</td><td class="n ${cls(P.S[i].ar)}">${pct(P.S[i].ar,1)}</td><td class="n ${cls(alpha[i])}">${Number.isFinite(alpha[i])?pct(alpha[i],1):"–"}</td></tr>`).join("")}
+      <tr><td><b>Portfolio</b></td><td class="n"><b>${pb.toFixed(2)}</b></td><td class="n ${cls(E)}"><b>${pct(E,1)}</b></td><td class="n ${cls(P.ret)}"><b>${pct(P.ret,1)}</b></td><td class="n ${cls(pa)}"><b>${Number.isFinite(pa)?pct(pa,1):"–"}</b></td></tr>
+    </tbody></table></div>
+    <table class="steps" style="margin-top:12px"><tbody>
+      <tr><td>Treynor ratio = (past return − risk-free) ÷ beta</td><td class="n">${pct(treynor,1)}</td></tr>
+      <tr><td>Jensen's alpha = past return − [risk-free + beta × (Nifty's past return − risk-free)]</td><td class="n ${cls(pa)}">${Number.isFinite(pa)?pct(pa,2):"–"}</td></tr>
+      <tr><td>${BN()}'s past return in this period</td><td class="n ${cls(rm)}">${Number.isFinite(rm)?pct(rm,1):"–"}</td></tr>
+    </tbody></table>
+    <p class="note">Alpha above 0: the stock did better than its beta alone would explain in this period. These are estimates from past data, not a forecast or advice.</p></div></div></section>`;
+}
+function bindExp(){
+  const e=$("#ermIn"),r=$("#rf2In");if(!e)return;
+  e.onchange=()=>{const v=parseFloat(e.value);if(Number.isFinite(v)&&v>-50&&v<100){state.erm=v/100;save();renderPortfolio()}};
+  r.onchange=()=>{const v=parseFloat(r.value);if(Number.isFinite(v)&&v>=0&&v<30){state.rf=v/100;save();renderPortfolio()}};
+}
+/* ---------- optimiser ---------- */
+const dot=(a,b)=>a.reduce((s,x,i)=>s+x*b[i],0);
+const quad=(w,S)=>w.reduce((s,wi,i)=>s+wi*dot(S[i],w),0);
+function projCap(v,cap){
+  const n=v.length;cap=Math.max(cap,1/n+1e-9);
+  let lo=Math.min(...v)-cap-1,hi=Math.max(...v)+1;
+  for(let it=0;it<80;it++){const m=(lo+hi)/2,s=v.reduce((a,x)=>a+Math.min(cap,Math.max(0,x-m)),0);if(s>1)lo=m;else hi=m}
+  const m=(lo+hi)/2;return v.map(x=>Math.min(cap,Math.max(0,x-m)));
+}
+function mvOpt(mu,S,lam,cap,w0){
+  const n=mu.length;let L=0;for(const r of S)L=Math.max(L,r.reduce((a,x)=>a+Math.abs(x),0));
+  const eta=1/(2*(L||1));let w=projCap(w0?w0.slice():Array(n).fill(1/n),cap);
+  for(let it=0;it<1200;it++){const g=S.map((r,i)=>2*dot(r,w)-lam*mu[i]);w=projCap(w.map((x,i)=>x-eta*g[i]),cap)}
+  return w;
+}
+function frontier(mu,S,cap){
+  const pts=[];let w=null;
+  for(const lam of [0,...Array.from({length:36},(_,k)=>.004*Math.pow(1.28,k))]){w=mvOpt(mu,S,lam,cap,w);pts.push({w:w.slice(),r:dot(w,mu),k:Math.sqrt(quad(w,S))})}
+  return pts;
+}
+function optimise(A,P,use,w,beta){
+  if(state.cap<1/use.length-1e-9)state.cap=[1,.5,.4,.3,.2].filter(c=>c>=1/use.length-1e-9).at(-1);
+  const erm=state.erm??ermDefault(),capmOK=beta.every(Number.isFinite),useCapm=state.optmu==="capm"&&capmOK;
+  const mu=useCapm?beta.map(b=>state.rf+b*(erm-state.rf)):P.S.map(s=>s.ar),S=P.C.map(r=>r.map(c=>c*TD)),n=use.length,cap=Math.max(state.cap,1/n),rf=state.rf;
+  const F=frontier(mu,S,cap),minV=F[0],sh=p=>(p.r-rf)/p.k,best=F.reduce((a,p)=>sh(p)>sh(a)?p:a,F[0]);
+  const pb=x=>x.reduce((s,v,i)=>s+v*beta[i],0),cur={w,r:useCapm?dot(w,mu):P.ret,k:P.risk};
+  const cols=[["Your mix",cur],["Lowest risk",minV],["Highest Sharpe",best]];
+  const capOpts=[1,.5,.4,.3,.2].filter(c=>c>=1/n-1e-9);
+  const html=`<section style="margin-top:28px"><h2>Optimiser and efficient frontier ${tip("frontier")}</h2>
+    <div class="ctl"><label style="font-size:14px;display:grid;gap:2px">Risk-free rate % a year<input id="rfIn" inputmode="decimal" value="${(rf*100).toFixed(2)}"></label>
+    <label style="font-size:14px;display:grid;gap:2px">Expected return used<select id="muIn"><option value="capm" ${useCapm?"selected":""} ${capmOK?"":"disabled"}>CAPM (beta-based, steadier)</option><option value="past" ${useCapm?"":"selected"}>Past return of this period</option></select></label>
+    <label style="font-size:14px;display:grid;gap:2px">Most in one stock<select id="capIn">${capOpts.map(c=>`<option value="${c}" ${Math.abs(c-cap)<1e-9?"selected":""}>${c===1?"No limit":pct(c,0)}</option>`).join("")}</select></label></div>
+    <div class="grid2"><div class="panel"><div class="fig" id="ffig"><svg role="img" aria-label="Efficient frontier"></svg></div>
+      <p class="note">The curve is the efficient frontier: for each level of risk, the highest return these stocks could have given (no short selling${cap<1?", at most "+pct(cap,0)+" in one stock":""}). The dashed line from the risk-free rate touches the curve at the highest-Sharpe mix. Returns used: ${useCapm?`CAPM, risk-free ${pct(state.rf,1)} + beta × (${pct(erm,1)} − ${pct(state.rf,1)})`:"past returns of the chosen period"}; risk always comes from the period's daily returns.</p></div>
+    <div><div class="scroll"><table><thead><tr><th>Weights</th>${cols.map(c=>`<th>${c[0]}</th>`).join("")}</tr></thead><tbody>
+      ${use.map((h,i)=>`<tr><td><b>${esc(h.sym)}</b></td>${cols.map(c=>`<td class="n">${pct(c[1].w[i],1)}</td>`).join("")}</tr>`).join("")}
+      <tr><td>Return a year</td>${cols.map(c=>`<td class="n ${cls(c[1].r)}"><b>${pct(c[1].r,1)}</b></td>`).join("")}</tr>
+      <tr><td>Risk a year</td>${cols.map(c=>`<td class="n"><b>${pct(c[1].k,1)}</b></td>`).join("")}</tr>
+      <tr><td>Sharpe ratio</td>${cols.map(c=>`<td class="n">${fx(sh(c[1]))}</td>`).join("")}</tr>
+      <tr><td>Beta</td>${cols.map(c=>`<td class="n">${Number.isFinite(pb(c[1].w))?pb(c[1].w).toFixed(2):"–"}</td>`).join("")}</tr>
+    </tbody></table></div>
+    <div class="row" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px"><button class="btn ghost" id="useMin" type="button">Use lowest-risk weights</button><button class="btn ghost" id="useBest" type="button">Use highest-Sharpe weights</button></div>
+    ${sh(best)<0?`<p class="note"><b>Note:</b> in this period every mix returned less than the risk-free rate (${pct(rf,1)}), so all Sharpe ratios are negative and "Highest Sharpe" is only the least bad mix. Try a longer period or CAPM returns.</p>`:""}
+    <p class="note"><b>A maths example, not a recommendation.</b> Weights come from past data and the return estimate you choose. Past-return weights often pile into last period's winners; CAPM returns are steadier. Check other periods before using any mix.</p></div></div></section>`;
+  const after=()=>{
+    draw($("#ffig"),(W,H)=>{
+      const tip=best;return scatter(W,H,[...P.S.map((s,i)=>({x:s.ak,y:mu[i],label:use[i].sym,small:1})),{x:minV.k,y:minV.r,label:"Lowest risk",min:1},{x:best.k,y:best.r,label:"Highest Sharpe"},{x:cur.k,y:cur.r,label:"Your mix",main:1}],
+        F.map(p=>({x:p.k,y:p.r})),[{x:0,y:rf},{x:tip.k*1.25,y:rf+(tip.r-rf)*1.25}]);
+    });
+    $("#rfIn").onchange=()=>{const v=parseFloat($("#rfIn").value);if(Number.isFinite(v)&&v>=0&&v<30){state.rf=v/100;save();renderPortfolio()}};
+    $("#capIn").onchange=()=>{state.cap=+$("#capIn").value;save();renderPortfolio()};
+    $("#muIn").onchange=()=>{state.optmu=$("#muIn").value;save();renderPortfolio()};
+    const apply=x=>{state.mode="wt";use.forEach((h,i)=>{h.wt=Math.round(x.w[i]*1000)/10});save();document.getElementsByName("mode").forEach(r=>r.checked=r.value==="wt");renderPortfolio();toast("Weights applied. Switch back to 'By quantity' any time.")};
+    $("#useMin").onclick=()=>apply(minV);$("#useBest").onclick=()=>apply(best);
+  };
+  return {html,after,minV,best};
+}
+let lastExport=null;
+function downloadCSV(){
+  const X=lastExport;if(!X)return;
+  const q=v=>{const s=String(v??"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s},f=(x,d=4)=>Number.isFinite(x)?x.toFixed(d):"";
+  const L=[["Portfolio Risk Lab"],["Period",`${state.period} year(s)`,X.A.dates[0],X.A.dates.at(-1)],["Daily returns used",X.A.dates.length-1],["Risk-free rate",f(state.rf)],[],
+    ["Stock","Name","Sector","Weight","Annual return","Annual risk","Sharpe","Beta","Risk share","Total return","CAGR","Daily variance","Data from","Daily returns"]];
+  X.use.forEach((h,i)=>{const s=X.P.S[i];L.push([h.sym,nm(h.sym),sectorOf(h.sym),f(X.w[i]),f(s.ar),f(s.ak),f((s.ar-state.rf)/s.ak),f(X.beta[i]),f(X.P.contrib[i]),f(s.pr),f(s.cagr),f(s.v,8),X.A.pd[i][0],s.n])});
+  L.push([],["Portfolio","","",f(1),f(X.P.ret),f(X.P.risk),f(X.psh),f(X.pb)],["Portfolio variance",f(X.P.v,6)],["Weighted average risk",f(X.P.wavg)]);
+  if(X.mS)L.push([BN(),"","","",f(X.mS.ar),f(X.mS.ak),f((X.mS.ar-state.rf)/X.mS.ak),"1"]);
+  if(X.beta.every(Number.isFinite)){const erm=state.erm??ermDefault();L.push([],["Expected return (CAPM)","Expected market return",f(erm),"Risk-free",f(state.rf)],["Stock","Beta","CAPM expected return"],...X.use.map((h,i)=>[h.sym,f(X.beta[i]),f(state.rf+X.beta[i]*(erm-state.rf))]),["Portfolio",f(X.pb),f(state.rf+X.pb*(erm-state.rf))])}
+  L.push([],["Correlation",...X.use.map(h=>h.sym)],...X.use.map((h,i)=>[h.sym,...X.P.corr[i].map(c=>f(c,3))]));
+  L.push([],["Daily covariance",...X.use.map(h=>h.sym)],...X.use.map((h,i)=>[h.sym,...X.P.C[i].map(c=>f(c,8))]));
+  if(X.opt)L.push([],["Optimiser weights","Your mix","Lowest risk","Highest Sharpe"],...X.use.map((h,i)=>[h.sym,f(X.w[i]),f(X.opt.minV.w[i]),f(X.opt.best.w[i])]),
+    ["Return",f(X.P.ret),f(X.opt.minV.r),f(X.opt.best.r)],["Risk",f(X.P.risk),f(X.opt.minV.k),f(X.opt.best.k)]);
+  const blob=new Blob(["﻿"+L.map(r=>r.map(q).join(",")).join("\n")],{type:"text/csv"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`portfolio-risk-${state.period}y-${X.A.dates.at(-1)}.csv`;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast("CSV downloaded. Open it in Excel.");
+}
+
+function viewPair(){
+  const upd=()=>{pickLabel($("#pa"),state.pairA);pickLabel($("#pb"),state.pairB);save();renderPair()};
+  $("#pa").onclick=()=>pick("First stock",s=>{state.pairA=s;upd()},[state.pairB]);
+  $("#pb").onclick=()=>pick("Second stock",s=>{state.pairB=s;upd()},[state.pairA]);
+  $("#pw").value=state.pairW;$("#pw").oninput=()=>{state.pairW=+$("#pw").value;save();renderPair(true)};
+  pickLabel($("#pa"),state.pairA);pickLabel($("#pb"),state.pairB);renderPair();
+}
+let pairCache=null;
+function renderPair(fast){
+  const a=state.pairA,b=state.pairB,wa=state.pairW/100;
+  $("#pwl").textContent=`Mix: ${state.pairW}% ${a} · ${100-state.pairW}% ${b}`;
+  const go=(ok,bad)=>{
+    if(ok.length<2){$("#pairres").innerHTML=errs(bad);$("#psteps").innerHTML="";return}
+    const A=alignEach([a,b],state.period),P=portfolio(A,[wa,1-wa]),[SA,SB]=P.S,c=P.C[0][1],rho=P.corr[0][1];
+    pairCache={key:a+b+state.period};
+    const wmin=Math.min(1,Math.max(0,(P.C[1][1]-c)/(P.C[0][0]+P.C[1][1]-2*c))),at=x=>portfolio(A,[x,1-x]),Pm=at(wmin),curve=[];
+    for(let x=0;x<=1.0001;x+=.02){const z=at(x);curve.push({x:z.risk,y:z.ret})}
+    $("#pairres").innerHTML=banner()+errs(bad)+`<div class="figs">
+      <div class="fig1"><div class="lab">Mix risk a year ${tip("risk")}</div><div class="big">${pct(P.risk,1)}</div></div>
+      <div class="fig1"><div class="lab">Mix return a year ${tip("ret")}</div><div class="big ${cls(P.ret)}">${pct(P.ret,1)}</div></div>
+      <div class="fig1"><div class="lab">Correlation ρ ${tip("corr")}</div><div class="mid">${rho.toFixed(2)}</div><div class="lab">${rho>.6?"move strongly together":rho>.3?"move moderately together":rho>-.1?"mostly independent":"tend to offset"}</div></div>
+    </div><div class="panel"><div class="fig" id="pf"><svg role="img" aria-label="Risk and return for every mix of the two stocks"></svg></div>
+    <p class="note">The curve is every mix from 100% ${esc(b)} to 100% ${esc(a)}. The ring is your mix; the hollow dot is the lowest-risk mix: ${pct(wmin,0)} ${esc(a)}, risk ${pct(Pm.risk,1)}.</p></div>`+shortNote(A);
+    draw($("#pf"),(W,H)=>scatter(W,H,[{x:SA.ak,y:SA.ar,label:a},{x:SB.ak,y:SB.ar,label:b},{x:Pm.risk,y:Pm.ret,min:1,small:1},{x:P.risk,y:P.ret,label:"Your mix",main:1}],curve));
+    $("#psteps").innerHTML=`<details><summary>See the step-by-step calculation</summary><div class="scroll"><table class="steps"><thead><tr><th>Step</th><th>${esc(a)}</th><th>${esc(b)}</th></tr></thead><tbody>
+      <tr><td>Annual return</td><td class="n ${cls(SA.ar)}">${pct(SA.ar)}</td><td class="n ${cls(SB.ar)}">${pct(SB.ar)}</td></tr>
+      <tr><td>Annual risk σ</td><td class="n">${pct(SA.ak)}</td><td class="n">${pct(SB.ak)}</td></tr>
+      <tr><td>Daily variance</td><td class="n">${SA.v.toFixed(6)}</td><td class="n">${SB.v.toFixed(6)}</td></tr>
+      <tr><td>Covariance (daily)</td><td class="n" colspan="2">${c.toFixed(6)}</td></tr>
+      <tr><td>Term 1: wA² × σA²</td><td class="n" colspan="2">${(wa*wa*SA.ak*SA.ak).toFixed(4)}</td></tr>
+      <tr><td>Term 2: wB² × σB²</td><td class="n" colspan="2">${((1-wa)**2*SB.ak*SB.ak).toFixed(4)}</td></tr>
+      <tr><td>Term 3: 2·wA·wB·ρ·σA·σB</td><td class="n" colspan="2">${(2*wa*(1-wa)*rho*SA.ak*SB.ak).toFixed(4)}</td></tr>
+      <tr><td><b>Risk = √(sum)</b></td><td class="n" colspan="2"><b>${pct(P.risk)}</b></td></tr>
+      <tr><td>Risk cut by mixing</td><td class="n" colspan="2">${pct(P.wavg-P.risk)}</td></tr>
+      <tr><td>Sharpe of the mix (risk-free ${pct(state.rf,1)})</td><td class="n" colspan="2">${fx((P.ret-state.rf)/P.risk)}</td></tr>
+    </tbody></table></div></details>`;
+  };
+  if(fast&&pairCache&&pairCache.key===a+b+state.period&&store[a]&&store[b]){token++;go([a,b],[]);return}
+  needs([a,b],$("#pairres"),go);
+}
+
+function viewSingle(){
+  $("#ss").onclick=()=>pick("Choose a stock",s=>{state.single=s;pickLabel($("#ss"),s);save();renderSingle()});
+  pickLabel($("#ss"),state.single);renderSingle();
+}
+function renderSingle(){
+  const s=state.single;
+  needs(hasIdx()?[s,IDX]:[s],$("#sres"),(ok,bad0)=>{
+    const bad=bad0.filter(b=>!b.startsWith(IDX));
+    if(!ok.includes(s)){$("#sres").innerHTML=errs(bad);$("#sstats").innerHTML="";return}
+    const wi=ok.includes(IDX),AA=align(wi?[s,IDX]:[s],state.period),A={...AA,px:[AA.px[0]],ret:[AA.ret[0]]},S=stats(A.px[0],A.ret[0],A.dates);
+    const mS=wi?stats(AA.px[1],AA.ret[1],AA.dates):null,beta=wi?cov(AA.ret[0],AA.ret[1])/cov(AA.ret[1],AA.ret[1]):NaN,corrM=wi?cov(AA.ret[0],AA.ret[1])/Math.sqrt(cov(AA.ret[0],AA.ret[0])*cov(AA.ret[1],AA.ret[1])):NaN;
+    $("#sres").innerHTML=banner()+`<div class="figs">
+      <div class="fig1"><div class="lab">Risk a year (SD) ${tip("risk")}</div><div class="big">${pct(S.ak,1)}</div></div>
+      <div class="fig1"><div class="lab">Total return (with dividends) ${tip("tr")}</div><div class="big ${cls(S.pr)}">${pct(S.pr,1)}</div></div>
+      <div class="fig1"><div class="lab">CAGR ${tip("cagr")}</div><div class="mid ${cls(S.cagr)}">${pct(S.cagr,1)}</div><div class="lab">per year</div></div>
+    </div><div class="panel"><div class="fig" id="sf"><svg role="img" aria-label="Price history"></svg></div>
+    <p class="note">${esc(nm(s))} · ${fmtD(A.dates[0])} to ${fmtD(A.dates.at(-1))} · the line includes dividends, so older prices are adjusted down a little</p></div>`+shortNote(A);
+    draw($("#sf"),(W,H)=>lineChart(W,H,A.dates,A.px[0]));
+    const raw=rawUpto(store[s]).filter(x=>x[0]>=A.dates[0]&&x[0]<=A.dates.at(-1)),prOnly=raw.length>1?raw.at(-1)[1]/raw[0][1]-1:NaN;
+    const dvs=(store[s].dv||[]).filter(x=>x[0]>A.dates[0]&&x[0]<=A.dates.at(-1)),dsum=dvs.reduce((a,x)=>a+x[1],0),T=tailRisk(A.ret[0],state.rf);
+    $("#sstats").innerHTML=`<table class="steps"><tbody>
+      <tr><td>Start → end price</td><td class="n">₹${num(raw.length?raw[0][1]:NaN)} → ₹${num(raw.length?raw.at(-1)[1]:NaN)}</td></tr>
+      <tr><td>Price return (no dividends)</td><td class="n ${cls(prOnly)}">${pct(prOnly,1)}</td></tr>
+      <tr><td>Dividends per share in the period</td><td class="n">${dvs.length?`₹${num(dsum)} (${dvs.length} payment${dvs.length>1?"s":""})`:"none"}</td></tr>
+      <tr><td>Total return (dividends reinvested)</td><td class="n ${cls(S.pr)}">${pct(S.pr,1)}</td></tr>
+      <tr><td>Daily returns used</td><td class="n">${S.n}</td></tr>
+      <tr><td>Average daily return</td><td class="n ${cls(S.m)}">${pct(S.m,3)}</td></tr>
+      <tr><td>Daily variance</td><td class="n">${S.v.toFixed(6)}</td></tr>
+      <tr><td>Daily SD (risk)</td><td class="n">${pct(S.sd)}</td></tr>
+      <tr><td>Annual return (× 252)</td><td class="n ${cls(S.ar)}">${pct(S.ar)}</td></tr>
+      <tr><td><b>Annual risk (× √252)</b></td><td class="n"><b>${pct(S.ak)}</b></td></tr>
+      <tr><td>Normal year (±1 SD, about 2 years in 3)</td><td class="n">${pct(S.ar-S.ak,0)} to ${pct(S.ar+S.ak,0)}</td></tr>
+      <tr><td>Best day</td><td class="n pos">${pct(S.best)}<br><span class="note">${fmtD(S.bd)}</span></td></tr>
+      <tr><td>Worst day</td><td class="n neg">${pct(S.worst)}<br><span class="note">${fmtD(S.wd)}</span></td></tr>
+      <tr><td>Days up / down</td><td class="n">${S.up} / ${S.down}</td></tr>
+      <tr><td>Biggest fall from a peak</td><td class="n neg">${pct(S.mdd,1)}</td></tr>
+      <tr><td>1-day VaR 95% / CVaR 95%</td><td class="n neg">${pct(T.var95,2)} / ${pct(T.cvar,2)}</td></tr>
+      <tr><td>Sortino ratio</td><td class="n">${Number.isFinite(T.sortino)?fx(T.sortino):"–"}</td></tr>
+      <tr><td>Traded a day (last 3 months)</td><td class="n">${STOCKS[s]&&STOCKS[s].tv!=null?`₹${num(STOCKS[s].tv)} crore`:"–"}</td></tr>
+      ${(F=>F?`<tr><td colspan="2"><b>Fundamentals</b> <span class="note">(Yahoo Finance, ${esc(fmtD(F[7]))})</span></td></tr>
+      <tr><td>P/E ratio ${tip("pe")}</td><td class="n">${F[0]!=null?fx(F[0],1):"–"}</td></tr>
+      <tr><td>P/B ratio ${tip("pb")}</td><td class="n">${F[1]!=null?fx(F[1],2):"–"}</td></tr>
+      <tr><td>ROE ${tip("roe")}</td><td class="n">${F[2]!=null?pct(F[2],1):"–"}</td></tr>
+      <tr><td>Debt to equity ${tip("de")}</td><td class="n">${F[3]!=null?fx(F[3]/100,2):"–"}</td></tr>
+      <tr><td>Profit margin</td><td class="n">${F[5]!=null?pct(F[5],1):"–"}</td></tr>
+      <tr><td>Market cap</td><td class="n">${F[4]!=null?`₹${num(F[4],0)} crore`:"–"}</td></tr>`:`<tr><td>Fundamentals</td><td class="n note">not loaded yet</td></tr>`)(fund(s))}
+      <tr><td>Sharpe ratio (risk-free ${pct(state.rf,1)})</td><td class="n">${fx((S.ar-state.rf)/S.ak)}</td></tr>
+      <tr><td>Beta vs ${BN()}</td><td class="n">${Number.isFinite(beta)?beta.toFixed(2):"–"}</td></tr>
+      <tr><td>Correlation with ${BN()}</td><td class="n">${Number.isFinite(corrM)?corrM.toFixed(2):"–"}</td></tr>
+      ${mS?`<tr><td>${BN()}, same period: return / risk</td><td class="n"><span class="${cls(mS.ar)}">${pct(mS.ar,1)}</span> / ${pct(mS.ak,1)}</td></tr>`:""}
+    </tbody></table>`;
+  });
+}
+function viewLearn(){
+  $("#srcnote").textContent="Prices: "+(meta&&meta.source?meta.source:"daily closing prices for NSE stocks")+". Updated every weekday evening"+(meta&&meta.updated?" (last update "+new Date(meta.updated).toLocaleString("en-IN")+")":"")+". Past risk and return do not predict the future. For learning, not investment advice.";
+}
+
+function toast(msg){const el=$("#toast");el.textContent=msg;el.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove("on"),1800)}
+const sectorOf=s=>(STOCKS[s]&&STOCKS[s].ind)||"Not classified";
+function healthHTML(use,w,P){
+  const n=use.length,sec={};use.forEach((h,i)=>{const s=sectorOf(h.sym);sec[s]=(sec[s]||0)+w[i]});
+  const secs=Object.entries(sec).sort((a,b)=>b[1]-a[1]),im=w.indexOf(Math.max(...w)),wmax=w[im],smax=secs[0][1],eqw=n>1&&Math.max(...w)-Math.min(...w)<.005;
+  let cs=0,cw=0;for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){cs+=w[i]*w[j]*P.corr[i][j];cw+=w[i]*w[j]}
+  const avgc=cw?cs/cw:1,lin=(x,good,bad)=>Math.max(0,Math.min(10,10*(bad-x)/(bad-good)));
+  const parts=[
+    ["Number of stocks",Math.min(10,n),`${n} stock${n>1?"s":""}. 10 or more gets full marks.`,"Add more stocks: 10 to 20 spread risk well."],
+    ["Biggest holding",lin(wmax,.10,.60),eqw?`Each stock is ${pct(wmax,0)} of your money.`:`${use[im].sym} is ${pct(wmax,0)} of your money.`,eqw?`Each stock is ${pct(wmax,0)} of your portfolio. Try to keep one stock under 20%.`:`${use[im].sym} is ${pct(wmax,0)} of your portfolio. Try to keep one stock under 20%.`],
+    ["Biggest sector",lin(smax,.25,.80),`${secs[0][0]} is ${pct(smax,0)}.`,`${secs[0][0]} is ${pct(smax,0)} of your portfolio. Add stocks from other sectors.`],
+    ["How alike they move",n>1?lin(avgc,.1,.8):0,n>1?`Average correlation ${avgc.toFixed(2)}.`:"Needs two or more stocks.","Your stocks move together a lot. Add stocks with low correlation to the ones you hold."]];
+  const sc=parts.reduce((a,p)=>a+p[1],0)/parts.length,verdict=sc>=7.5?"Well diversified":sc>=5?"Fairly diversified":"Needs more spread";
+  const tips=parts.filter(p=>p[1]<6).map(p=>`<li>${esc(p[3])}</li>`).join("");
+  return `<section style="margin-top:28px"><div class="grid2">
+    <div class="panel"><h2>Portfolio health ${tip("health")}</h2><div class="score"><span class="big ${sc<5?"neg":"pos"}">${sc.toFixed(1)}</span><span class="mid">/ 10</span></div><p style="margin:2px 0 10px;font-weight:600">${verdict}</p>
+      <div class="bars">${parts.map(p=>`<div><span>${esc(p[0])}</span><span class="meter"><i style="width:${p[1]*10}%;${p[1]<5?"background:var(--red)":""}"></i></span><span class="v">${p[1].toFixed(1)}</span></div>`).join("")}</div>
+      <p class="note">${parts.map(p=>esc(p[2])).join(" ")}</p>${tips?`<ul class="tips">${tips}</ul>`:`<p class="note">No warnings. Your mix is well spread.</p>`}
+      <p class="note">Score = average of the four parts. Each part is 10 when you are well spread and 0 when everything is in one place.</p></div>
+    <div class="panel"><h2>Sectors</h2><div class="bars">${secs.map(([s,v])=>`<div><span>${esc(s)}</span><span class="meter"><i style="width:${v*100}%"></i></span><span class="v">${pct(v,0)}</span></div>`).join("")}</div>
+      <p class="note">Share of your money in each sector${state.mode==="qty"?", at the latest prices":""}.</p></div>
+  </div></section>`;
+}
+function metric(x,y){const mm=state.edu?x.m30:x.m,m=mm&&mm[String(y)];return m?{ar:m[0],ak:m[1],pr:m[2],cagr:m[3],beta:m[4]==null?NaN:m[4],rr:m[1]>0?(m[0]-state.rf)/m[1]:NaN}:null}
+function viewHome(){
+  const ups=LIST.filter(x=>x.chg>0).length,downs=LIST.filter(x=>x.chg<0).length,last=LIST.map(x=>x.date).sort().at(-1);
+  if(EDU_CUT)$("#hstrip").innerHTML=`<span><b>${LIST.length}</b>NSE stocks</span><span><b>${esc(fmtD(EDU_CUT))}</b>data up to (education mode)</span>`;else $("#hstrip").innerHTML=`<span><b>${LIST.length}</b>NSE stocks</span><span><b>${esc(fmtD(last))}</b>latest prices</span><span><b><span class="pos">${ups}</span> / <span class="neg">${downs}</span></b>up / down ${LIVE?"today, live":"that day"}</span>`;
+  const anyN5=LIST.some(x=>x.n5),y=state.period,pts=LIST.filter(x=>!anyN5||x.n5).map(x=>({x,m:metric(x,y)})).filter(p=>p.m&&Number.isFinite(p.m.ak));
+  $("#htitle").textContent=`${sample?"Sample stocks":"Nifty 500"}: risk vs return, last ${y} year${y>1?"s":""}`;
+  if(!pts.length){$("#hfig").innerHTML=`<p class="load">No data for this period yet.</p>`;return}
+  const lim=(a,q)=>{const s=a.slice().sort((p,r)=>p-r);return s[Math.min(s.length-1,Math.floor(q*(s.length-1)))]};
+  const xs=pts.map(p=>p.m.ak),ys=pts.map(p=>p.m.ar),xmax=lim(xs,.98),ymin=lim(ys,.01),ymax=lim(ys,.99);
+  const shown=pts.filter(p=>p.m.ak<=xmax&&p.m.ar>=ymin&&p.m.ar<=ymax);
+  const best=shown.slice().sort((a,b)=>b.m.rr-a.m.rr)[0],big=shown.slice().sort((a,b)=>b.m.ar-a.m.ar)[0];
+  const med=a=>{const s=a.slice().sort((p,r)=>p-r);return s[Math.floor(s.length/2)]};
+  $("#hnote").textContent=`Each dot is a stock${STOCKS[IDX]?"; the ring is "+BN():""}. Middle stock: risk ${pct(med(xs),0)}, return ${pct(med(ys),0)} a year.${pts.length>shown.length?" A few extreme stocks are left off so the rest are readable.":""}`;
+  const nm0=STOCKS[IDX]?metric(STOCKS[IDX],y):null;
+  draw($("#hfig"),(W,H)=>scatter(W,H,[...shown.map(p=>({x:p.m.ak,y:p.m.ar,small:1,label:(p===best||p===big)?p.x.sym:""})),...(nm0?[{x:nm0.ak,y:nm0.ar,label:"NIFTY 50",main:1}]:[])]));
+}
+let scrSort="rr",scrUni="n5";
+function viewScreen(){
+  const secs=[...new Set(LIST.map(x=>x.ind||"Not classified"))].sort();
+  $("#suni").value=scrUni;$("#suni").addEventListener("input",()=>{scrUni=$("#suni").value;drawScreen()});
+  $("#ssec").innerHTML=`<option value="">All sectors</option>`+secs.map(s=>`<option>${esc(s)}</option>`).join("");
+  $("#ssort").value=scrSort;$("#srf").value=(state.rf*100).toFixed(2);
+  $("#srf").onchange=()=>{const v=parseFloat($("#srf").value);if(Number.isFinite(v)&&v>=0&&v<30){state.rf=v/100;save();drawScreen()}};
+  ["#sq","#ssec","#ssort","#sliq"].forEach(id=>$(id).addEventListener("input",drawScreen));
+  $("#stab").addEventListener("click",ev=>{const b=ev.target.closest("[data-add]");if(!b)return;const s=b.dataset.add;
+    if(!state.holdings.some(h=>h.sym===s)){state.holdings.push({sym:s,qty:10,buy:0,wt:10});save()}b.disabled=true;b.textContent="Added";toast(s+" added to your portfolio")});
+  drawScreen();
+}
+function drawScreen(){
+  const q=$("#sq").value.trim().toLowerCase(),sec=$("#ssec").value,y=state.period;scrSort=$("#ssort").value;
+  const anyN5=LIST.some(x=>x.n5),uni=r=>scrUni==="fund"?!!r.x.k:!anyN5||scrUni==="all"||(scrUni==="n5"?r.x.n5:!r.x.n5&&!r.x.k);
+  let rows=LIST.map(x=>({x,m:metric(x,y)})).filter(r=>r.m&&uni(r)&&(!sec||(r.x.ind||"Not classified")===sec)&&(!q||r.x.sym.toLowerCase().includes(q)||r.x.name.toLowerCase().includes(q))&&(!$("#sliq").checked||(r.x.tv??0)>=1));
+  const key={lowb:r=>Number.isFinite(r.m.beta)?r.m.beta:99,rr:r=>-r.m.rr,ar:r=>-r.m.ar,lowk:r=>r.m.ak,cagr:r=>-r.m.cagr,chg:r=>-(r.x.chg||0),liq:r=>-(r.x.tv||0),pe:r=>{const F=fund(r.x.sym);return F&&F[0]>0?F[0]:1e9},roe:r=>{const F=fund(r.x.sym);return F&&F[2]!=null?-F[2]:1e9}}[scrSort];
+  rows.sort((a,b)=>key(a)-key(b));
+  const held=new Set(state.holdings.map(h=>h.sym));
+  $("#scount").textContent=`${rows.length} stock${rows.length===1?"":"s"} · period ${y} year${y>1?"s":""}`;
+  $("#stab").innerHTML=`<thead><tr><th>Stock</th><th class="hide-s">Sector</th>${EDU_CUT?"":`<th class="hide-s">Last ₹</th><th class="hide-s">Today</th>`}<th>Return</th><th>Risk</th><th>Sharpe</th><th class="hide-s">Beta</th><th class="hide-s">Traded ₹ cr/day</th><th class="hide-s">P/E</th><th class="hide-s">ROE</th><th></th></tr></thead><tbody>${
+    rows.slice(0,300).map(({x,m})=>`<tr><td><b>${esc(x.sym)}</b><br><span class="note" style="margin:0">${esc(x.name.length>20?x.name.slice(0,19)+"…":x.name)}</span></td><td class="hide-s">${esc(x.ind||"Not classified")}</td>${EDU_CUT?"":`<td class="n hide-s">${num(x.last)}</td><td class="n hide-s ${cls(x.chg||0)}">${pct(x.chg,1)}</td>`}<td class="n ${cls(m.ar)}">${pct(m.ar,1)}</td><td class="n">${pct(m.ak,1)}</td><td class="n">${Number.isFinite(m.rr)?fx(m.rr):"–"}</td><td class="n hide-s">${Number.isFinite(m.beta)?m.beta.toFixed(2):"–"}</td><td class="n hide-s ${x.tv!=null&&x.tv<1?"neg":""}">${x.tv==null?"–":num(x.tv,x.tv<10?2:0)}</td><td class="n hide-s">${(F=>F&&F[0]!=null?fx(F[0],1):"–")(fund(x.sym))}</td><td class="n hide-s">${(F=>F&&F[2]!=null?pct(F[2],0):"–")(fund(x.sym))}</td><td><button class="add" data-add="${esc(x.sym)}" ${held.has(x.sym)?"disabled>Added":">+ Add"}</button></td></tr>`).join("")}</tbody>`;
+  if(rows.length>300)$("#stab").insertAdjacentHTML("beforeend",`<tbody><tr><td colspan="11" class="note">Showing the first 300. Search or pick a sector to narrow the list.</td></tr></tbody>`);
+}
+
+function benchSel(){
+  const opts=Object.values(STOCKS).filter(x=>x.ind==="Index").sort((a,b)=>a.sym===NIFTY?-1:b.sym===NIFTY?1:a.name<b.name?-1:1);
+  return `<label class="bench">Compare with <select class="benchIn">${opts.map(x=>`<option value="${esc(x.sym)}" ${x.sym===IDX?"selected":""}>${esc(x.name)}</option>`).join("")}</select> ${tip("bench")}</label>`;
+}
+document.addEventListener("change",ev=>{const t=ev.target;if(t.classList&&t.classList.contains("benchIn")){state.bench=t.value;IDX=t.value;save();route()}});
+
+/* ---------- simple explanations for beginners ---------- */
+const HELP={
+ risk:"Risk (standard deviation) shows how much the yearly return usually swings. 20% risk means a normal year can be about 20% better or worse than average. Lower is calmer.",
+ ret:"Average yearly return over the period you picked (1, 3, 5 or 10 years), with dividends included. It is the past, not a promise.",
+ sharpe:"Sharpe ratio = (return − fixed-deposit rate) ÷ risk. It shows how much extra return you got for each unit of risk. Below 0: worse than an FD. 0 to 1: okay. Above 1: good.",
+ beta:"Beta shows how much the stock or portfolio moves when the market moves. Beta 1.3: if the market falls 10%, expect about a 13% fall. Below 1 is calmer than the market.",
+ cut:"Risk cut by mixing: how much risk went away because the stocks do not all move together (diversification). Bigger is better.",
+ gain:"Gain on your cost: today's value minus what you paid, for holdings where you entered a buy price.",
+ corr:"Correlation runs from −1 to +1. Near +1: the two stocks move together. Near 0: independent. Low correlation lowers portfolio risk.",
+ cagr:"CAGR is the steady yearly growth rate that turns the start value into the end value. It is the real growth you would have got.",
+ tr:"Total return: price change plus dividends, as if each dividend was reinvested.",
+ capm:"CAPM: expected return = FD rate + beta × (expected market return − FD rate). A fair expectation for the market risk you take, not a forecast.",
+ range:"About 2 years in 3 the yearly return should fall inside this range, if returns follow a bell curve. Real markets have more surprises.",
+ var:"VaR 95%: on 1 trading day in 20 you could lose at least this much. CVaR is the average loss on those bad days.",
+ mdd:"Biggest fall from a peak (max drawdown): the worst drop from a high point to a later low. It shows how painful the worst stretch was.",
+ sortino:"Sortino ratio: like Sharpe, but only the downside swings count as risk. Higher is better.",
+ covid:"What your mix would have lost in the COVID crash (19 Feb to 23 Mar 2020), using each stock's real fall.",
+ health:"A 0–10 score for how well the money is spread: number of stocks, biggest holding, biggest sector and how alike the stocks move.",
+ share:"Risk share: how much of the portfolio's total risk comes from each stock. It can be bigger than the stock's share of the money.",
+ contrib:"Return contribution = weight × the stock's return. The contributions add up to the portfolio's return, so you can see which stocks earned it.",
+ frontier:"The efficient frontier is the best return possible for each level of risk with your stocks. Lowest risk is its left end; highest Sharpe is the best return per unit of risk.",
+ twrr:"TWRR (time-weighted return) measures the stock picking only; money you add or take out does not change it. SEBI asks portfolio managers to report it.",
+ xirr:"XIRR is your own yearly return, taking into account when you put money in and took it out. Same as Excel's XIRR.",
+ mc:"Monte Carlo: the site plays out 5,000 possible futures using the portfolio's expected return and risk. It shows a likely range, not a prediction.",
+ bench:"The benchmark is what your portfolio is compared with for beta, alpha and performance. Nifty 50 TRI includes dividends; the other indices are price indices.",
+ amt:"Type the money you want to invest. The site splits it (equally or by your weights), works out whole shares at the latest price and shows the cash left over.",
+ pe:"P/E = share price ÷ yearly earnings per share. How many years of today's profit you pay for. High P/E: the market expects growth, or the stock is expensive.",
+ pb:"P/B = share price ÷ book value per share. Below 1 means the price is less than the company's net assets on paper.",
+ roe:"ROE (return on equity) = profit ÷ shareholders' money. Above 15% is usually considered good.",
+ de:"Debt to equity = borrowings ÷ shareholders' money. Higher means more borrowed money and more financial risk.",
+ req:"Required return: the yearly growth your money needs to reach the goal in time.",
+ alloc:"Asset allocation: how the money is split between equity (growth, more risk), debt (steady) and gold (protection)."
+};
+const tip=k=>`<button class="tip" type="button" data-tip="${k}" aria-label="What does this mean?">?</button>`;
+document.addEventListener("click",ev=>{
+  const b=ev.target.closest&&ev.target.closest(".tip");let pop=document.getElementById("tipPop");
+  if(!b){if(pop&&!ev.target.closest("#tipPop"))pop.remove();return}
+  ev.preventDefault();ev.stopPropagation();
+  if(pop&&pop.dataset.k===b.dataset.tip){pop.remove();return}
+  if(pop)pop.remove();
+  pop=document.createElement("div");pop.id="tipPop";pop.dataset.k=b.dataset.tip;pop.setAttribute("role","tooltip");pop.textContent=HELP[b.dataset.tip]||"";
+  document.body.appendChild(pop);const r=b.getBoundingClientRect(),w=Math.min(320,innerWidth-24);pop.style.width=w+"px";
+  pop.style.left=Math.max(12,Math.min(innerWidth-w-12,r.left+scrollX-w/2))+"px";pop.style.top=(r.bottom+scrollY+8)+"px";
+});
+/* ---------- plan: risk profile, goal, asset allocation, IPS ---------- */
+const RQ=[
+ ["Age",["Over 60","50 to 60","40 to 50","30 to 40","Under 30"]],
+ ["How long can this money stay invested?",["Under 1 year","1 to 3 years","3 to 5 years","5 to 10 years","More than 10 years"]],
+ ["How steady is the income?",["No regular income","Not steady","Fairly steady","Steady","Very steady, with other savings"]],
+ ["Emergency money kept aside",["None","Under 3 months of expenses","3 to 6 months","6 to 12 months","More than 12 months"]],
+ ["Investing experience",["None","Only FD / RD","Mutual funds","Direct stocks","Stocks and derivatives"]],
+ ["If the portfolio fell 20% in a month, what would they do?",["Sell everything","Sell some","Wait and worry","Hold and review","Buy more"]],
+ ["Main aim of this money",["Keep it safe","Regular income","Balance of safety and growth","Growth","Maximum growth"]],
+ ["This money is what share of all savings?",["More than 75%","50 to 75%","25 to 50%","10 to 25%","Under 10%"]]];
+const PROF=[["Conservative",8,14,{eq:20,debt:70,gold:10}],["Moderately conservative",15,20,{eq:35,debt:55,gold:10}],["Moderate",21,27,{eq:50,debt:40,gold:10}],["Moderately aggressive",28,33,{eq:65,debt:25,gold:10}],["Aggressive",34,40,{eq:80,debt:10,gold:10}]];
+const ASSET={eq:["Equity","NIFTYBEES"],debt:["Debt","GILT5YBEES"],gold:["Gold","GOLDBEES"]};
+function ipsDefault(){return {ans:[],goal:5000000,years:10,now:500000,sip:20000,alloc:null,ret:null}}
+const profOf=sc=>PROF.find(p=>sc>=p[1]&&sc<=p[2])||null;
+const normCdf=x=>{const t=1/(1+.2316419*Math.abs(x)),d=.3989423*Math.exp(-x*x/2),p=d*t*(.3193815+t*(-.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return x>0?1-p:p};
+function fv(now,sip,r,yrs){const i=Math.pow(1+r,1/12)-1,n=Math.round(yrs*12);return now*Math.pow(1+i,n)+(Math.abs(i)<1e-12?sip*n:sip*(Math.pow(1+i,n)-1)/i)}
+function reqReturn(g){if(!(g.goal>0&&g.years>0))return NaN;if(fv(g.now,g.sip,-0.99,g.years)>=g.goal)return -0.99;let lo=-0.99,hi=2;if(fv(g.now,g.sip,hi,g.years)<g.goal)return NaN;for(let k=0;k<200;k++){const m=(lo+hi)/2;if(fv(g.now,g.sip,m,g.years)<g.goal)lo=m;else hi=m}return (lo+hi)/2}
+function assetClass(sym){const x=STOCKS[sym];if(!x)return "Equity";if(x.k==="REIT"||x.k==="InvIT")return "Real estate and infra";
+  if(x.k==="ETF"){const t=(x.sym+" "+x.name).toLowerCase();if(/gold/.test(t))return "Gold";if(/silver/.test(t))return "Silver";if(/liquid|gilt|bond|g-?sec|sdl|bharat|debt|money|overnight|treasury|tbill|crisil|psu ?bnd|1d|cash/.test(t))return "Debt"}
+  return "Equity"}
+const CLS2KEY={Equity:"eq",Debt:"debt",Gold:"gold"};
+function viewPlan(){
+  state.ips=state.ips||ipsDefault();const I=state.ips;
+  $("#rq").innerHTML=RQ.map(([q,opts],i)=>`<div class="q"><p>${i+1}. ${esc(q)}</p>${opts.map((o,j)=>`<label><input type="radio" name="rq${i}" value="${j+1}" ${I.ans[i]===j+1?"checked":""}> ${esc(o)}</label>`).join("")}</div>`).join("");
+  $("#rq").querySelectorAll("input").forEach(inp=>inp.onchange=()=>{const i=+inp.name.slice(2);I.ans[i]=+inp.value;const sc=score();if(sc.done&&!I.manual)I.alloc={...profOf(sc.sum)[3]};save();drawPlan()});
+  const bind=(id,k)=>{$(id).value=I[k];$(id).onchange=()=>{const v=parseFloat(String($(id).value).replace(/,/g,""));if(Number.isFinite(v)&&v>=0){I[k]=v;save();drawPlan()}}};
+  bind("#gAmt","goal");bind("#gYrs","years");bind("#gNow","now");bind("#gSip","sip");
+  drawPlan();
+}
+function score(){const a=state.ips.ans,n=RQ.filter((_,i)=>a[i]).length;return {done:n===RQ.length,n,sum:a.reduce((s,x)=>s+(x||0),0)}}
+function drawPlan(){
+  const I=state.ips,sc=score(),pf=sc.done?profOf(sc.sum):null;
+  $("#rpres").innerHTML=sc.done?`<div class="figs" style="margin-top:12px"><div class="fig1"><div class="lab">Risk score</div><div class="big">${sc.sum}<span class="note"> / 40</span></div></div><div class="fig1"><div class="lab">Risk profile</div><div class="mid">${pf[0]}</div><div class="lab">model mix: ${pf[3].eq}% equity · ${pf[3].debt}% debt · ${pf[3].gold}% gold</div></div></div>
+    <p class="note">Bands: 8–14 Conservative, 15–20 Moderately conservative, 21–27 Moderate, 28–33 Moderately aggressive, 34–40 Aggressive. The model mixes are textbook examples for learning, not advice.</p>`:`<p class="note">${sc.n} of ${RQ.length} answered.</p>`;
+  const r=reqReturn(I);
+  $("#gres").innerHTML=Number.isFinite(r)?`<p style="margin:0">To grow ₹${num(I.now,0)} plus ₹${num(I.sip,0)} a month into <b>₹${num(I.goal,0)}</b> in ${num(I.years,I.years%1?1:0)} years, the money must earn <b class="${r>0.15?"neg":""}">${pct(Math.max(r,0),1)} a year</b> (required return).</p>${r>0.15?`<p class="warn">Above 15% a year is hard to expect. Raise the SIP, extend the time, or lower the goal.</p>`:""}`:`<p class="note">Enter the goal, years, money now and SIP.</p>`;
+  if(!I.alloc)I.alloc=pf?{...pf[3]}:{eq:50,debt:40,gold:10};
+  const proxies=Object.values(ASSET).map(a=>a[1]).filter(s=>STOCKS[s]);
+  if(proxies.length<3){$("#alloc").innerHTML=`<p class="note">Asset data (NIFTYBEES, GILT5YBEES, GOLDBEES) not available.</p>`;drawIPS(null);return}
+  needs(proxies,$("#alloc"),(ok)=>{
+    if(ok.length<3){$("#alloc").innerHTML=`<p class="err">Could not load the asset prices.</p>`;return}
+    const A=alignEach(proxies,5),P=portfolio(A,[1/3,1/3,1/3]),keys=["eq","debt","gold"];
+    I.ret=I.ret||{eq:state.erm??ermDefault(),debt:Math.round(P.S[1].cagr*1000)/1000,gold:Math.round(Math.min(P.S[2].cagr,.10)*1000)/1000};
+    const calc=al=>{const w=keys.map(k=>al[k]/100),mu=keys.reduce((s,k,i)=>s+w[i]*I.ret[k],0);let v=0;for(let i=0;i<3;i++)for(let j=0;j<3;j++)v+=w[i]*w[j]*P.C[i][j];return {mu,sd:Math.sqrt(v*TD)}};
+    const tot=keys.reduce((s,k)=>s+I.alloc[k],0),me=calc(I.alloc),yrs=I.years||1,chance=Number.isFinite(r)?normCdf((me.mu-r)/(me.sd/Math.sqrt(yrs))):NaN;
+    $("#alloc").innerHTML=`${keys.map((k,i)=>`<div class="allocrow"><b>${ASSET[k][0]}</b><input type="range" min="0" max="100" step="5" value="${I.alloc[k]}" data-a="${k}" aria-label="${ASSET[k][0]} %"><span class="n"><b>${I.alloc[k]}%</b></span></div>`).join("")}
+      ${tot!==100?`<p class="warn">The mix adds up to ${tot}%. Make it 100%.</p>`:""}
+      <div class="txrow" style="margin-top:8px">${keys.map((k,i)=>`<label>${ASSET[k][0]} expected % a year<input data-r="${k}" inputmode="decimal" value="${(I.ret[k]*100).toFixed(1)}"></label>`).join("")}
+        <button class="add" id="toModel" type="button" ${pf?"":"disabled"}>Use the ${pf?esc(pf[0].toLowerCase()):"profile's"} model mix</button></div>
+      <div class="figs" style="margin-top:14px">
+        <div class="fig1"><div class="lab">Expected return a year ${tip("capm")}</div><div class="big ${cls(me.mu)}">${pct(me.mu,1)}</div></div>
+        <div class="fig1"><div class="lab">Risk a year (SD) ${tip("risk")}</div><div class="big">${pct(me.sd,1)}</div></div>
+        <div class="fig1"><div class="lab">Required return ${tip("req")}</div><div class="mid">${Number.isFinite(r)?pct(Math.max(r,0),1):"–"}</div><div class="lab">${Number.isFinite(r)?(me.mu>=r?"the mix is expected to cover it":"the mix falls short"):""}</div></div>
+        <div class="fig1"><div class="lab">Chance of beating the required return</div><div class="mid">${Number.isFinite(chance)?pct(chance,0):"–"}</div><div class="lab">over ${num(yrs,0)} years (rough, bell curve)</div></div>
+      </div>
+      <div class="scroll"><table><thead><tr><th>Model mix</th><th class="n">Equity</th><th class="n">Debt</th><th class="n">Gold</th><th class="n">Expected</th><th class="n">Risk</th></tr></thead><tbody>${PROF.map(p=>{const c=calc(p[3]);return `<tr ${pf&&pf[0]===p[0]?'style="background:var(--tealbg)"':""}><td>${p[0]}${pf&&pf[0]===p[0]?" ←":""}</td><td class="n">${p[3].eq}%</td><td class="n">${p[3].debt}%</td><td class="n">${p[3].gold}%</td><td class="n">${pct(c.mu,1)}</td><td class="n">${pct(c.sd,1)}</td></tr>`}).join("")}</tbody></table></div>
+      <p class="note">Correlations over 5 years: equity–debt ${P.corr[0][1].toFixed(2)}, equity–gold ${P.corr[0][2].toFixed(2)}, debt–gold ${P.corr[1][2].toFixed(2)}. Low or negative correlation is why a mix is safer than equity alone. Gold's expected return starts at its 5-year CAGR capped at 10%, because the recent gold rally is unlikely to repeat every year.</p>`;
+    $("#alloc").querySelectorAll("[data-a]").forEach(inp=>inp.onchange=()=>{I.alloc[inp.dataset.a]=+inp.value;I.manual=true;save();drawPlan()});
+    $("#alloc").querySelectorAll("[data-r]").forEach(inp=>inp.onchange=()=>{const v=parseFloat(inp.value);if(Number.isFinite(v)&&v>-50&&v<60){I.ret[inp.dataset.r]=v/100;save();drawPlan()}});
+    if(pf)$("#toModel").onclick=()=>{I.alloc={...pf[3]};I.manual=false;save();drawPlan()};
+    drawIPS({me,r,chance,pf,sc});
+  });
+}
+function drawIPS(X){
+  const I=state.ips,el=$("#ips");if(!el)return;
+  if(!X){el.innerHTML=`<p class="note">Finish steps 1 to 3.</p>`;return}
+  const {me,r,chance,pf,sc}=X,hz=I.years>=7?"long":I.years>=3?"medium":"short",pms=I.now>=5000000;
+  el.innerHTML=`<table class="steps"><tbody>
+    <tr><td><b>Date</b></td><td>${esc(fmtD(new Date().toISOString().slice(0,10)))}</td></tr>
+    <tr><td><b>Return objective</b></td><td>${Number.isFinite(r)?`${pct(Math.max(r,0),1)} a year needed to reach ₹${num(I.goal,0)} in ${num(I.years,0)} years`:"–"}</td></tr>
+    <tr><td><b>Risk tolerance</b></td><td>${pf?`${pf[0]} (score ${sc.sum}/40)`:"questionnaire not finished"}</td></tr>
+    <tr><td><b>Time horizon</b></td><td>${num(I.years,0)} years (${hz} term)</td></tr>
+    <tr><td><b>Liquidity</b></td><td>${["None","Under 3 months","3–6 months","6–12 months","Over 12 months"][(I.ans[3]||1)-1]} of expenses kept as emergency money; withdrawals not planned before the goal</td></tr>
+    <tr><td><b>Strategic asset allocation</b></td><td>Equity ${I.alloc.eq}% · Debt ${I.alloc.debt}% · Gold ${I.alloc.gold}% → expected ${pct(me.mu,1)} a year, risk ${pct(me.sd,1)}${Number.isFinite(chance)?`, about ${pct(chance,0)} chance of beating the required return`:""}</td></tr>
+    <tr><td><b>Rebalancing rule</b></td><td>Check every quarter; rebalance when any asset is more than 5 percentage points away from its target</td></tr>
+    <tr><td><b>Benchmark</b></td><td>Equity: Nifty 50 TRI · Debt: GILT5YBEES · Gold: GOLDBEES</td></tr>
+    <tr><td><b>Performance measure</b></td><td>TWRR against the benchmark (SEBI method for portfolio managers), plus XIRR for the investor</td></tr>
+    <tr><td><b>Vehicle</b></td><td>${pms?"Money now is ₹50 lakh or more, the SEBI minimum for PMS, so a PMS is possible besides mutual funds and direct stocks":"Below the ₹50 lakh SEBI minimum for PMS: mutual funds, ETFs or direct stocks fit"}</td></tr>
+  </tbody></table><p class="note">An educational IPS made from your answers. Not investment advice; a SEBI-registered adviser should review a real plan.</p>`;
+}
+function allocHTML(use,w,val){
+  const I=state.ips;if(!I||!I.alloc)return `<section style="margin-top:28px"><h2>Asset mix vs your plan</h2><p class="note">Set a target mix on the <a href="plan/" data-v="plan">Plan</a> page to see drift and rebalancing here.</p></section>`;
+  const act={};use.forEach((h,i)=>{const c=assetClass(h.sym);act[c]=(act[c]||0)+w[i]});
+  const rows=[...new Set(["Equity","Debt","Gold",...Object.keys(act)])].map(c=>{const tg=(I.alloc[CLS2KEY[c]]??0)/100,a=act[c]||0;return {c,a,tg,d:a-tg}});
+  const need=rows.some(x=>Math.abs(x.d)>.05);
+  return `<section style="margin-top:28px"><h2>Asset mix vs your plan (rebalancing)</h2><div class="scroll"><table><thead><tr><th>Asset</th><th class="n">Now</th><th class="n">Target</th><th class="n">Drift</th>${val>0?`<th class="n">To reach target</th>`:""}</tr></thead><tbody>
+    ${rows.map(x=>`<tr><td>${esc(x.c)}</td><td class="n">${pct(x.a,1)}</td><td class="n">${pct(x.tg,0)}</td><td class="n ${Math.abs(x.d)>.05?"neg":""}">${x.d>=0?"+":""}${pct(x.d,1)}</td>${val>0?`<td class="n">${Math.abs(x.d*val)<1?"–":(x.d>0?"sell ":"buy ")+"₹"+num(Math.abs(x.d*val),0)}</td>`:""}</tr>`).join("")}</tbody></table></div>
+    <p class="${need?"warn":"note"}">${need?"Rebalance: at least one asset is more than 5 percentage points from its target.":"Within the ±5 point band: no rebalancing needed."} ETFs are grouped as gold, silver or debt from their names; everything else counts as equity.</p></section>`;
+}
+/* ---------- performance from a buy/sell list: TWRR, XIRR, Nifty comparison ---------- */
+const closeOn=(s,d)=>{const a=store[s];if(!a)return NaN;let lo=0,hi=a.length-1,r=-1;while(lo<=hi){const m=(lo+hi)>>1;if(a[m][0]<=d){r=m;lo=m+1}else hi=m-1}return r>=0?a[r][1]:NaN};
+function xirr(cf){
+  cf=cf.filter(x=>Math.abs(x[1])>1e-9).sort((a,b)=>a[0]<b[0]?-1:1);
+  if(!cf.some(x=>x[1]<0)||!cf.some(x=>x[1]>0))return NaN;
+  const t0=Date.parse(cf[0][0]),T=cf.map(x=>(Date.parse(x[0])-t0)/864e5/365),f=r=>cf.reduce((a,x,i)=>a+x[1]/Math.pow(1+r,T[i]),0);
+  let lo=-0.9999,hi=100,flo=f(lo);if(flo*f(hi)>0)return NaN;
+  for(let i=0;i<300;i++){const m=(lo+hi)/2,fm=f(m);if(Math.abs(hi-lo)<1e-10)break;if(flo*fm<=0)hi=m;else{lo=m;flo=fm}}
+  return (lo+hi)/2;
+}
+const ann=(g,days)=>days>=365?Math.pow(1+g,365/days)-1:g;
+function perfCalc(tx){
+  const notes=[],errs=[];
+  const lastAll=[...new Set(tx.map(x=>x.sym)),...(store[IDX]?[IDX]:[])].map(s=>rawUpto(store[s]).at(-1)[0]).reduce((a,b)=>a<b?a:b);
+  const end=lastAll,later=tx.filter(x=>x.d>end);
+  if(later.length)notes.push(`${later.length} entr${later.length>1?"ies are":"y is"} after ${fmtD(end)}${EDU_CUT?" (education mode)":""} and left out.`);
+  const T=tx.filter(x=>x.d<=end).map(x=>({...x})).sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:(a.type==="buy"?-1:1));
+  if(!T.length)return {errs:["Add at least one buy."],notes};
+  // split, bonus or demerger after the trade: convert to today's shares, keeping the money the same
+  for(const x of T){const c=closeOn(x.sym,x.d),k=c/x.price;x.uq=x.qty;x.up=x.price;
+    if(Number.isFinite(k)&&(k<0.8||k>1.25)){x.uq=x.qty/k;x.up=c;notes.push(`${x.sym} on ${fmtD(x.d)}: your price ₹${num(x.price)} vs the adjusted close ₹${num(c)}, so it is treated as a split, bonus or demerger since then: ${num(x.qty,0)} shares count as ${num(x.uq,2)} of today's shares.`)}}
+  {const h={};for(const x of T){h[x.sym]=h[x.sym]||0;if(x.type==="buy")h[x.sym]+=x.uq;else if(x.uq>h[x.sym]+1e-6){errs.push(`Sell of ${num(x.qty,0)} ${x.sym} on ${fmtD(x.d)} is more than you held then; it is left out.`);x.skip=1}else h[x.sym]-=x.uq}}
+  const TT=T.filter(x=>!x.skip),syms=[...new Set(TT.map(x=>x.sym))];if(!TT.length)return {errs,notes};
+  const cal=(store[IDX]?rawUpto(store[IDX]):rawUpto(store[syms[0]])).map(x=>x[0]);
+  const start=TT[0].d,dates=cal.filter(d=>d>=start&&d<=end);
+  if(!dates.length||dates[0]>start&&!cal.includes(start))dates.unshift(start);
+  const dvm={};for(const s of syms){dvm[s]=new Map();for(const [d,a] of (store[s].dv||[])){const dd=dates.find(x=>x>=d);if(dd)dvm[s].set(dd,(dvm[s].get(dd)||0)+a)}}
+  const hold={},lots={},real={},divs={},cf=[],series=[];let cum=1,prevV=0,net=0,divTot=0,ti=0,pn0=null,un=0;
+  const pn=d=>store[IDX]?closeOn(IDX,d):NaN;
+  for(const d of dates){
+    let D=0,B=0,S=0;
+    for(const s in hold){const a=dvm[s].get(d);if(a&&hold[s]>0){D+=hold[s]*a;divs[s]=(divs[s]||0)+hold[s]*a}}
+    while(ti<TT.length&&TT[ti].d<=d){const x=TT[ti++],s=x.sym,amt=x.uq*x.up;hold[s]=hold[s]||0;lots[s]=lots[s]||[];
+      if(x.type==="buy"){hold[s]+=x.uq;lots[s].push([x.uq,x.up]);B+=amt;cf.push([d,-amt])}
+      else{let q=x.uq,cost=0;while(q>1e-9&&lots[s].length){const L=lots[s][0],t=Math.min(q,L[0]);cost+=t*L[1];L[0]-=t;q-=t;if(L[0]<=1e-9)lots[s].shift()}
+        hold[s]-=x.uq;real[s]=(real[s]||0)+amt-cost;S+=amt;cf.push([d,amt])}}
+    const V=Object.entries(hold).reduce((a,[s,q])=>a+q*closeOn(s,d),0),den=prevV+B,r=den>0?(V+D+S)/den-1:0;
+    cum*=1+r;if(D>0)cf.push([d,D]);divTot+=D;net+=B-S;
+    const p=pn(d);if(pn0==null&&Number.isFinite(p))pn0=p;if(Number.isFinite(p))un+=(B-S-D)/p;
+    series.push({d,cum,V,net,n:Number.isFinite(p)&&pn0?p/pn0:NaN,un:un*p});prevV=V;
+  }
+  const last=series.at(-1),days=(Date.parse(end)-Date.parse(series[0].d))/864e5;
+  const fin=cf.concat(last.V>0?[[end,last.V]]:[]),nfin=cf.concat(last.un>0?[[end,last.un]]:[]);
+  const at=from=>{const k=series.findLast(x=>x.d<=from);return k?k:null};
+  const per=[["1 month",30],["3 months",91],["6 months",182],["1 year",365],["3 years",1096],["5 years",1826]].map(([l,dd])=>{
+    const f=new Date(Date.parse(end)-dd*864e5).toISOString().slice(0,10),k=f>=series[0].d?at(f):null;
+    return k?{l,dd,p:ann(last.cum/k.cum-1,dd),n:ann(last.n/k.n-1,dd)}:null}).filter(Boolean);
+  const hs=syms.map(s=>{const q=hold[s]||0,cost=(lots[s]||[]).reduce((a,L)=>a+L[0]*L[1],0),px=closeOn(s,end);
+    return {s,q,avg:q>1e-9?cost/q:NaN,px,val:q*px,unr:q*px-cost,real:real[s]||0,div:divs[s]||0}});
+  return {errs,notes,series,end,days,tw:last.cum-1,twA:ann(last.cum-1,days),nf:last.n-1,nfA:ann(last.n-1,days),
+    xirr:xirr(fin),nx:xirr(nfin),V:last.V,net,divTot,gain:last.V-net+divTot,unV:last.un,per,hs,
+    real:hs.reduce((a,h)=>a+h.real,0),unr:hs.reduce((a,h)=>a+h.unr,0)};
+}
+function twoLine(W,H,dates,a,b){
+  const m={l:56,r:18,t:16,b:34},all=a.concat(b.filter(Number.isFinite)),[y0,y1]=pad(Math.min(...all),Math.max(...all),.06),n=dates.length-1;
+  const X=i=>m.l+i/Math.max(1,n)*(W-m.l-m.r),Y=v=>H-m.b-(v-y0)/(y1-y0)*(H-m.t-m.b);let g="";
+  const st=(y1-y0)/4;for(let k=0;k<=4;k++){const v=y0+st*k;g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--rule)"/><text x="${m.l-8}" y="${Y(v)+4}" text-anchor="end">${num(v,0)}</text>`}
+  const nt=W<520?3:5;for(let k=0;k<nt;k++){const i=Math.round(k/(nt-1)*n);g+=`<text x="${X(i)}" y="${H-10}" text-anchor="${k===0?"start":k===nt-1?"end":"middle"}">${fmtD(dates[i]).slice(3)}</text>`}
+  const line=(p,c,dash)=>`<polyline fill="none" stroke="${c}" stroke-width="2" ${dash?'stroke-dasharray="5 4"':""} points="${p.map((v,i)=>Number.isFinite(v)?X(i)+","+Y(v):"").filter(Boolean).join(" ")}"/>`;
+  g+=line(b,"var(--ink)",1)+line(a,"var(--teal)");
+  g+=`<text class="lbl" x="${X(n)-6}" y="${Y(a[n])-8}" text-anchor="end" fill="var(--teal)">You ₹${num(a[n],0)}</text>`;
+  if(Number.isFinite(b[n]))g+=`<text class="lbl" x="${X(n)-6}" y="${Y(b[n])+16}" text-anchor="end">Nifty 50 ₹${num(b[n],0)}</text>`;
+  return g;
+}
+const cleanTx=t=>(Array.isArray(t)?t:[]).slice(0,1000).map(x=>({d:String(x&&x.d||"").slice(0,10),sym:cleanSym(x&&x.sym),type:x&&x.type==="sell"?"sell":"buy",qty:Math.max(0,+x.qty||0),price:Math.max(0,+x.price||0)})).filter(x=>/^\d{4}-\d\d-\d\d$/.test(x.d)&&x.sym&&x.qty>0&&x.price>0);
+function viewPerf(){
+  const lastD=EDU_CUT||LIST.map(x=>x.date).sort().at(-1)||new Date().toISOString().slice(0,10);
+  $("#txD").value=$("#txD").value||lastD;$("#txD").max=lastD;
+  const fill=()=>{const s=state.txSym,d=$("#txD").value;if(!s||!d||!STOCKS[s])return;ensure(s).then(()=>{const c=closeOn(s,d);if(Number.isFinite(c)){$("#txP").value=c.toFixed(2);$("#txHint").textContent=`close on or before ${fmtD(d)}: ₹${num(c)}; change it to your real price`}else $("#txHint").textContent="no price before this date"}).catch(()=>{})};
+  pickLabel($("#txS"),state.txSym);$("#benchBoxP").innerHTML=hasIdx()?benchSel():"";
+  $("#txS").onclick=()=>pick("Stock bought or sold",s=>{state.txSym=s;pickLabel($("#txS"),s);save();fill()});
+  $("#txD").onchange=fill;fill();
+  $("#txAdd").onclick=()=>{const x=cleanTx([{d:$("#txD").value,sym:state.txSym,type:$("#txT").value,qty:$("#txQ").value,price:$("#txP").value}])[0];
+    if(!x){$("#txErr").textContent="Fill in the date, stock, quantity and price.";return}
+    if(x.d>lastD){$("#txErr").textContent="The date is after the latest price.";return}
+    $("#txErr").textContent="";state.tx.push(x);save();renderPerf()};
+  $("#txExp").onclick=()=>{const L=[["Date","Symbol","Type","Quantity","Price"],...state.tx.map(x=>[x.d,x.sym,x.type==="sell"?"Sell":"Buy",x.qty,x.price])];
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([L.map(r=>r.join(",")).join("\n")],{type:"text/csv"}));a.download="buy-sell-list.csv";document.body.appendChild(a);a.click();a.remove()};
+  $("#txImp").onclick=()=>$("#txFile").click();
+  $("#txFile").onchange=async()=>{const f=$("#txFile").files[0];if(!f)return;const rows=(await f.text()).split(/\r?\n/).map(l=>l.split(/[,;\t]/).map(c=>c.trim().replace(/^"|"$/g,""))).filter(r=>r.length>=5);
+    const toD=v=>{let m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);if(m)return `${m[1]}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}`;m=v.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);return m?`${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`:""};
+    const got=cleanTx(rows.map(r=>({d:toD(r[0]),sym:r[1].toUpperCase(),type:/^s/i.test(r[2])?"sell":"buy",qty:r[3],price:r[4]}))),bad=got.filter(x=>!STOCKS[x.sym]).map(x=>x.sym);
+    state.tx.push(...got.filter(x=>STOCKS[x.sym]));save();$("#txFile").value="";toast(`${got.length-bad.length} entries imported`+(bad.length?`; not found: ${[...new Set(bad)].join(", ")}`:""));renderPerf()};
+  $("#txEx").onclick=async()=>{const ex=[["2021-01-04","TCS","buy",10],["2021-06-01","HDFCBANK","buy",20],["2022-03-01","INFY","buy",15],["2023-09-01","ITC","buy",100],["2024-06-03","TCS","sell",4],["2025-02-03","HDFCBANK","buy",10]];
+    await Promise.allSettled(ex.map(e=>ensure(e[1])));state.tx=cleanTx(ex.map(([d,sym,type,qty])=>({d,sym,type,qty,price:Math.round(closeOn(sym,d)*100)/100})));save();renderPerf()};
+  let clr=0;$("#txClr").onclick=()=>{if(Date.now()-clr>3000){clr=Date.now();$("#txClr").textContent="Tap again to clear";return}state.tx=[];save();renderPerf();$("#txClr").textContent="Clear all"};
+  renderPerf();
+}
+function renderPerf(){
+  const tx=state.tx;
+  $("#txList").innerHTML=tx.length?`<div class="scroll"><table><thead><tr><th>Date</th><th>Stock</th><th></th><th>Qty</th><th>Price ₹</th><th></th></tr></thead><tbody>${
+    tx.map((x,i)=>[x,i]).sort((a,b)=>a[0].d<b[0].d?-1:1).map(([x,i])=>`<tr><td>${esc(fmtD(x.d))}</td><td><b>${esc(x.sym)}</b></td><td class="${x.type==="sell"?"neg":"pos"}">${x.type==="sell"?"Sell":"Buy"}</td><td class="n">${num(x.qty,x.qty%1?2:0)}</td><td class="n">${num(x.price)}</td><td><button class="rm" data-tx="${i}" aria-label="Delete">×</button></td></tr>`).join("")}</tbody></table></div>`:`<p class="note">No entries yet. Add your first buy, import a CSV, or load the example.</p>`;
+  $("#txList").querySelectorAll("[data-tx]").forEach(b=>b.onclick=()=>{state.tx.splice(+b.dataset.tx,1);save();renderPerf()});
+  if(!tx.length){$("#perfres").innerHTML=banner()+`<p class="load">Your performance appears here after the first buy.</p>`;return}
+  const syms=[...new Set(tx.map(x=>x.sym))].filter(s=>STOCKS[s]),missing=[...new Set(tx.map(x=>x.sym))].filter(s=>!STOCKS[s]);
+  needs(hasIdx()?syms.concat(IDX):syms,$("#perfres"),(ok,bad)=>{
+    const R=perfCalc(tx.filter(x=>ok.includes(x.sym)));
+    const e=[...missing.map(s=>s+" is not in the stock list."),...bad.filter(b=>!b.startsWith(IDX)),...(R.errs||[])];
+    if(!R.series){$("#perfres").innerHTML=errs(e);return}
+    const yrs=R.days/365,lab=yrs>=1?"a year":"so far",alpha=R.twA-R.nfA;
+    $("#perfres").innerHTML=banner()+errs(e)+`<div class="figs">
+      <div class="fig1"><div class="lab">Value on ${esc(fmtD(R.end))}</div><div class="mid">₹${num(R.V,0)}</div></div>
+      <div class="fig1"><div class="lab">Money in (buys − sells)</div><div class="mid">₹${num(R.net,0)}</div></div>
+      <div class="fig1"><div class="lab">Total gain incl. dividends</div><div class="mid ${cls(R.gain)}">${rs(R.gain)}</div></div>
+      <div class="fig1"><div class="lab">TWRR ${lab} ${tip("twrr")}</div><div class="big ${cls(R.twA)}">${pct(R.twA,1)}</div><div class="lab">${yrs>=1?`${pct(R.tw,1)} in ${num(yrs,1)} years`:"not per year: under 1 year"}</div></div>
+      <div class="fig1"><div class="lab">XIRR (your money) ${tip("xirr")}</div><div class="big ${cls(R.xirr)}">${Number.isFinite(R.xirr)?pct(R.xirr,1):"–"}</div><div class="lab">per year</div></div>
+      <div class="fig1"><div class="lab">${BN()} TWRR ${lab}</div><div class="mid ${cls(R.nfA)}">${Number.isFinite(R.nfA)?pct(R.nfA,1):"–"}</div><div class="lab">${Number.isFinite(alpha)?`you ${alpha>=0?"beat":"trailed"} it by ${pct(Math.abs(alpha),1)}`:""}</div></div>
+    </div><div class="panel"><div class="fig" id="perffig"><svg role="img" aria-label="Growth of 100 rupees, you versus ${BN()}"></svg></div>
+    <p class="note">Growth of ₹100 measured by TWRR, so adding or taking out money does not move the line. Dashed: ${BN()} over the same days. ${fmtD(R.series[0].d)} to ${fmtD(R.end)}.</p></div>
+    <div class="scroll"><table class="steps"><thead><tr><th>Period (TWRR${R.per.some(p=>p.dd>=365)?", per year for 1 year and longer":""})</th><th class="n">You</th><th class="n">${BN()}</th><th class="n">Difference</th></tr></thead><tbody>
+      ${R.per.map(p=>`<tr><td>${p.l}</td><td class="n ${cls(p.p)}">${pct(p.p,1)}</td><td class="n ${cls(p.n)}">${pct(p.n,1)}</td><td class="n ${cls(p.p-p.n)}">${pct(p.p-p.n,1)}</td></tr>`).join("")}
+      <tr><td><b>Since your first buy</b></td><td class="n ${cls(R.twA)}"><b>${pct(R.twA,1)}</b></td><td class="n ${cls(R.nfA)}"><b>${pct(R.nfA,1)}</b></td><td class="n ${cls(alpha)}"><b>${pct(alpha,1)}</b></td></tr>
+    </tbody></table></div>
+    <div class="panel" style="margin-top:14px"><p style="margin:0"><b>Same money in ${BN()}:</b> if every buy had gone into ${BN()} on the same day (and every sale and dividend taken out), you would have <b>₹${num(R.unV,0)}</b> now instead of ₹${num(R.V,0)}. Its XIRR: <b>${Number.isFinite(R.nx)?pct(R.nx,1):"–"}</b> vs your ${Number.isFinite(R.xirr)?pct(R.xirr,1):"–"}.</p></div>
+    <h3 style="margin-top:20px">Holdings and gains</h3><div class="scroll"><table><thead><tr><th>Stock</th><th>Shares</th><th class="hide-s">Avg cost ₹</th><th class="hide-s">Last ₹</th><th>Value ₹</th><th>Unrealised</th><th>Realised</th><th class="hide-s">Dividends</th></tr></thead><tbody>
+      ${R.hs.map(h=>`<tr><td><b>${esc(h.s)}</b></td><td class="n">${num(h.q,h.q%1>1e-6?2:0)}</td><td class="n hide-s">${num(h.avg)}</td><td class="n hide-s">${num(h.px)}</td><td class="n">${num(h.val,0)}</td><td class="n ${cls(h.unr)}">${rs(h.unr)}</td><td class="n ${cls(h.real)}">${h.real?rs(h.real):"–"}</td><td class="n hide-s">${h.div?"₹"+num(h.div,0):"–"}</td></tr>`).join("")}
+      <tr><td><b>Total</b></td><td></td><td class="hide-s"></td><td class="hide-s"></td><td class="n"><b>${num(R.V,0)}</b></td><td class="n ${cls(R.unr)}"><b>${rs(R.unr)}</b></td><td class="n ${cls(R.real)}"><b>${rs(R.real)}</b></td><td class="n hide-s"><b>₹${num(R.divTot,0)}</b></td></tr>
+    </tbody></table></div>
+    <p style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost" id="toPort" type="button">Analyse these holdings on the Portfolio page</button><button class="btn ghost" type="button" onclick="window.print()">Print performance report</button></p>
+    ${R.notes.length?`<p class="note">${R.notes.map(esc).join("<br>")}</p>`:""}
+    <p class="note"><b>TWRR</b> measures the stock picking and is what SEBI asks portfolio managers to report. <b>XIRR</b> is the yearly return on your own money and timing. Realised gains use FIFO. Dividends are counted on their ex-date for shares held the day before. ${STOCKS[IDX]&&STOCKS[IDX].file==="_NIFTY50TRI"?"Benchmark: Nifty 50 Total Return Index (dividends included).":"Benchmark: "+BN()+" (price index, dividends not included), so the comparison slightly favours you."} No brokerage, taxes or fees are included. For learning, not investment advice.</p>`;
+    draw($("#perffig"),(W,H)=>twoLine(W,H,R.series.map(x=>x.d),R.series.map(x=>x.cum*100),R.series.map(x=>x.n*100)));
+    $("#toPort").onclick=()=>{state.holdings=R.hs.filter(h=>h.q>1e-6).map(h=>({sym:h.s,qty:Math.round(h.q*100)/100,buy:Math.round(h.avg*100)/100,wt:10}));state.mode="qty";save();go("portfolio")};
+  });
+}
+const views={home:["t-home",viewHome],plan:["t-plan",viewPlan],perf:["t-perf",viewPerf],screen:["t-screen",viewScreen],portfolio:["t-portfolio",viewPortfolio],pair:["t-pair",viewPair],single:["t-single",viewSingle],learn:["t-learn",viewLearn]};
+/* ---------- accounts and saved portfolios (Firebase) ---------- */
+const FBCFG={apiKey:"AIzaSyC3ZYgWqcT0-tG7-lSlKzcM-9JEcnhB6OM",authDomain:"risklab---karthi.firebaseapp.com",projectId:"risklab---karthi",storageBucket:"risklab---karthi.firebasestorage.app",messagingSenderId:"78064528496",appId:"1:78064528496:web:8fef81fcb71999471b18b5"};
+let FB=null,user=null,cloud=[],curId=null,cloudT=null,cloudMsg="";
+const onPortfolio=()=>["portfolio","perf"].includes(curView());
+async function fbInit(){
+  try{
+    const B="https://www.gstatic.com/firebasejs/10.12.2/";
+    const [app,A,F]=await Promise.all([import(B+"firebase-app.js"),import(B+"firebase-auth.js"),import(B+"firebase-firestore.js")]);
+    const a=app.initializeApp(FBCFG);FB={A,F,auth:A.getAuth(a),db:F.getFirestore(a)};
+    A.onAuthStateChanged(FB.auth,u=>{user=u;acct();if(u){$("#authDlg").open&&$("#authDlg").close();loadCloud()}else{cloud=[];curId=null;if(onPortfolio())drawCloud()}});
+    acct();
+  }catch(e){FB=null;$("#acct").innerHTML="";console.warn("Sign-in unavailable",e)}
+}
+function acct(){
+  const el=$("#acct");if(!el)return;
+  if(!FB){el.innerHTML="";return}
+  el.innerHTML=user?`<span class="who">${esc((user.displayName||user.email||"Signed in").slice(0,24))}</span><button class="pill" id="outBtn" type="button">Sign out</button><button class="pill" id="delAcct" type="button" title="Delete your account and all saved portfolios">Delete account</button>`
+    :`<button class="pill" id="inBtn" type="button">Sign in</button>`;
+  if(user){$("#outBtn").onclick=()=>FB.A.signOut(FB.auth).then(()=>toast("Signed out"));$("#delAcct").onclick=deleteAccount}
+  else $("#inBtn").onclick=openAuth;
+  if(onPortfolio())drawCloud();
+}
+let delAcctArm=0;
+async function deleteAccount(){
+  const b=$("#delAcct");
+  if(Date.now()-delAcctArm>4000){delAcctArm=Date.now();b.textContent="Tap again to delete everything";return}
+  b.disabled=true;b.textContent="Deleting…";
+  try{
+    const F=FB.F,snap=await F.getDocs(pcol());
+    for(const d of snap.docs)await F.deleteDoc(d.ref);
+    await FB.A.deleteUser(FB.auth.currentUser);
+    cloud=[];curId=null;toast("Your account and saved portfolios are deleted");
+  }catch(e){
+    b.disabled=false;b.textContent="Delete account";
+    alertBox(e&&e.code==="auth/requires-recent-login"?"Your portfolios are deleted. For safety, please sign out, sign in again and tap Delete account once more to remove the account itself.":"Could not delete: "+authErr(e));
+  }
+}
+function alertBox(msg){cloudMsg=msg;toast(msg.slice(0,90));if(onPortfolio())drawCloud()}
+function openAuth(){const d=$("#authDlg");$("#aErr").textContent="";if(typeof d.showModal==="function")d.showModal();else d.setAttribute("open","")}
+const authErr=e=>{const c=(e&&e.code)||"";return ({"auth/invalid-credential":"Wrong email or password.","auth/wrong-password":"Wrong email or password.","auth/user-not-found":"No account with this email. Tap Create account.","auth/email-already-in-use":"This email already has an account. Tap Sign in.","auth/weak-password":"Use a password of at least 6 characters.","auth/invalid-email":"That email address doesn't look right.","auth/unauthorized-domain":"This website isn't allowed to sign in yet (Firebase authorized domains).","auth/popup-closed-by-user":"Sign-in window was closed.","auth/network-request-failed":"No internet connection."})[c]||((e&&e.message)||"Something went wrong.")};
+function openPriv(){const d=$("#privDlg");d.showModal?d.showModal():d.setAttribute("open","")}
+function bindAuth(){
+  $("#aClose").onclick=()=>$("#authDlg").close();
+  $("#privBtn").onclick=openPriv;$("#aPriv").onclick=openPriv;$("#prClose").onclick=()=>$("#privDlg").close();
+  $("#eduBtn").textContent=state.edu?"Education mode: on (turn off)":"Education mode (30-day delayed data)";
+  $("#eduBtn").onclick=()=>setEdu(!state.edu);
+  $("#aGoogle").onclick=async()=>{const P=new FB.A.GoogleAuthProvider();try{await FB.A.signInWithPopup(FB.auth,P)}catch(e){if(["auth/popup-blocked","auth/operation-not-supported-in-this-environment","auth/cancelled-popup-request"].includes(e.code))FB.A.signInWithRedirect(FB.auth,P);else $("#aErr").textContent=authErr(e)}};
+  const em=()=>$("#aEmail").value.trim(),pw=()=>$("#aPass").value;
+  $("#aIn").onclick=()=>FB.A.signInWithEmailAndPassword(FB.auth,em(),pw()).catch(e=>$("#aErr").textContent=authErr(e));
+  $("#aNew").onclick=()=>FB.A.createUserWithEmailAndPassword(FB.auth,em(),pw()).catch(e=>$("#aErr").textContent=authErr(e));
+  $("#aForgot").onclick=()=>{if(!em()){$("#aErr").textContent="Type your email first.";return}FB.A.sendPasswordResetEmail(FB.auth,em()).then(()=>$("#aErr").textContent="Password reset email sent.").catch(e=>$("#aErr").textContent=authErr(e))};
+}
+const pcol=()=>FB.F.collection(FB.db,"users",user.uid,"portfolios");
+const clean=h=>(Array.isArray(h)?h:[]).slice(0,100).map(x=>({sym:cleanSym(x&&x.sym),qty:Math.max(0,+x.qty||0),buy:Math.max(0,+x.buy||0),wt:Math.max(0,+x.wt||0)})).filter(x=>x.sym);
+const payload=()=>({holdings:clean(state.holdings),mode:state.mode==="wt"?"wt":"qty",period:+state.period||1,tx:cleanTx(state.tx),...(state.ips?{ips:JSON.parse(JSON.stringify(state.ips))}:{})});
+async function loadCloud(pick){
+  try{
+    const F=FB.F,snap=await F.getDocs(F.query(pcol(),F.orderBy("updated","desc")));
+    cloud=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(!cloud.length){const r=await F.addDoc(pcol(),{name:"My portfolio",...payload(),created:F.serverTimestamp(),updated:F.serverTimestamp()});cloud=[{id:r.id,name:"My portfolio",...payload(),updated:null}];cloudMsg="Your current holdings are saved as “My portfolio”."}
+    const c=cloud.find(x=>x.id===pick)||cloud[0];openCloud(c);
+  }catch(e){cloudMsg="Could not load your portfolios: "+authErr(e);if(onPortfolio())drawCloud()}
+}
+function openCloud(c){
+  curId=c.id;state.holdings=clean(c.holdings);state.tx=cleanTx(c.tx);if(c.ips&&typeof c.ips==="object")state.ips=c.ips;state.mode=c.mode==="wt"?"wt":"qty";setPeriod(+c.period||state.period||1);
+  try{localStorage.setItem("rrlab:state",JSON.stringify(state))}catch(e){}
+  if(onPortfolio())route();
+}
+function cloudSave(){
+  if(!(FB&&user&&curId))return;clearTimeout(cloudT);
+  cloudT=setTimeout(async()=>{try{await FB.F.updateDoc(FB.F.doc(pcol(),curId),{...payload(),updated:FB.F.serverTimestamp()});const c=cloud.find(x=>x.id===curId);if(c)Object.assign(c,payload(),{updated:{toDate:()=>new Date()}});cloudMsg="Saved to your account at "+new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})+".";const m=$("#cloudMsg");if(m)m.textContent=cloudMsg}catch(e){cloudMsg="Not saved: "+authErr(e);const m=$("#cloudMsg");if(m)m.textContent=cloudMsg}},800);
+}
+let nameCb=null;
+function askName(title,val,cb){nameCb=cb;$("#nTitle").textContent=title;$("#nIn").value=val||"";const d=$("#nameDlg");d.showModal?d.showModal():d.setAttribute("open","");setTimeout(()=>$("#nIn").select(),50)}
+function bindName(){
+  $("#nForm").onsubmit=ev=>{ev.preventDefault();const v=$("#nIn").value.trim().slice(0,80);if(!v)return;$("#nameDlg").close();if(nameCb)nameCb(v)};
+  $("#nCancel").onclick=()=>$("#nameDlg").close();
+}
+let delArm=0;
+function drawCloud(){
+  const el=$("#cloud");if(!el)return;
+  if(!FB){el.innerHTML="";return}
+  if(!user){el.innerHTML=`<div class="cloudbox"><p style="margin:0 0 8px">Sign in to save several portfolios to your account and open them on any phone or laptop.</p><button class="btn ghost" id="cIn" type="button">Sign in</button></div>`;$("#cIn").onclick=openAuth;return}
+  const fmt=c=>c.updated&&c.updated.toDate?c.updated.toDate().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}):"";
+  el.innerHTML=`<div class="cloudbox"><label for="pfSel" style="font-size:13px;color:var(--mute)">Saved portfolio</label>
+    <select id="pfSel" style="width:100%;margin:2px 0 8px">${cloud.map(c=>`<option value="${esc(c.id)}" ${c.id===curId?"selected":""}>${esc(c.name||"Untitled")}${fmt(c)?" · "+esc(fmt(c)):""}</option>`).join("")}</select>
+    <div style="display:flex;flex-wrap:wrap;gap:8px"><button class="add" id="cNew" type="button">+ New</button><button class="add" id="cCopy" type="button">Save as new</button><button class="add" id="cRen" type="button">Rename</button><button class="add" id="cDel" type="button" style="color:var(--red);border-color:var(--rule)">Delete</button></div>
+    <p class="note" id="cloudMsg" style="margin:8px 0 0">${esc(cloudMsg||"Changes save to your account automatically.")}</p></div>`;
+  const F=FB.F;
+  $("#pfSel").onchange=()=>{const c=cloud.find(x=>x.id===$("#pfSel").value);if(c){cloudMsg="Opened “"+(c.name||"Untitled")+"”.";openCloud(c)}};
+  const create=async(name,data)=>{try{const r=await F.addDoc(pcol(),{name,...data,created:F.serverTimestamp(),updated:F.serverTimestamp()});cloudMsg="Saved “"+name+"”.";await loadCloud(r.id)}catch(e){cloudMsg="Not saved: "+authErr(e);drawCloud()}};
+  $("#cNew").onclick=()=>askName("Name for the new portfolio","Portfolio "+(cloud.length+1),n=>create(n,{holdings:[],mode:"qty",period:+state.period||1,tx:[]}));
+  $("#cCopy").onclick=()=>askName("Save a copy as","Copy of "+((cloud.find(x=>x.id===curId)||{}).name||"portfolio"),n=>create(n,payload()));
+  $("#cRen").onclick=()=>{const c=cloud.find(x=>x.id===curId);if(!c)return;askName("Rename portfolio",c.name,async n=>{try{await F.updateDoc(F.doc(pcol(),c.id),{name:n,updated:F.serverTimestamp()});c.name=n;cloudMsg="Renamed to “"+n+"”.";drawCloud()}catch(e){cloudMsg="Not renamed: "+authErr(e);drawCloud()}})};
+  $("#cDel").onclick=async()=>{const c=cloud.find(x=>x.id===curId);if(!c)return;
+    if(Date.now()-delArm>4000){delArm=Date.now();$("#cDel").textContent="Tap again to delete";cloudMsg="";return}
+    delArm=0;try{await F.deleteDoc(F.doc(pcol(),c.id));cloudMsg="Deleted “"+(c.name||"Untitled")+"”.";curId=null;await loadCloud()}catch(e){cloudMsg="Not deleted: "+authErr(e);drawCloud()}};
+}
+function curView(){
+  const seg=location.pathname.slice((window.BASE||"/").length).replace(/index\.html$/,"").replace(/\/$/,""),h=location.hash.slice(1);
+  return views[seg]?seg:views[h]?h:"home";
+}
+function go(v,push=true){
+  const url=(window.BASE||"/")+(v==="home"?"":v+"/");
+  if(push&&location.pathname+location.hash!==url)history.pushState({v},"",url);
+  route();window.scrollTo(0,0);
+}
+document.addEventListener("click",ev=>{
+  const a=ev.target.closest&&ev.target.closest("a[data-v]");if(!a||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.button)return;
+  ev.preventDefault();go(a.dataset.v);
+});
+window.addEventListener("popstate",()=>route());
+function route(){
+  const tab=curView();
+  const titles={home:"Portfolio Risk Lab",plan:"Plan",portfolio:"Portfolio",perf:"Performance",pair:"Two stocks",single:"One stock",screen:"Screener",learn:"Formulas"};
+  document.title=tab==="home"?"Portfolio Risk Lab":titles[tab]+" · Portfolio Risk Lab";
+  document.querySelectorAll("#tabs a").forEach(a=>a.toggleAttribute("aria-current",a.dataset.v===tab));
+  const [tid,fn]=views[tab];$("#main").replaceChildren($("#"+tid).content.cloneNode(true));token++;fn();
+  if(tab==="portfolio"||tab==="perf")drawCloud();
+}
+function setPeriod(y){state.period=y;document.querySelectorAll("#period button").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.y===y)))}
+document.querySelectorAll("#period button").forEach(b=>b.onclick=()=>{setPeriod(+b.dataset.y);save();route()});
+window.addEventListener("hashchange",()=>{const h=location.hash.slice(1);if(views[h])history.replaceState({},"",(window.BASE||"/")+(h==="home"?"":h+"/"));route()});
+{const h=location.hash.slice(1);if(views[h])history.replaceState({},"",(window.BASE||"/")+(h==="home"?"":h+"/"))}
+try{const d=JSON.parse(localStorage.getItem("rrlab:state"));if(d&&Array.isArray(d.holdings)){Object.assign(state,d);setPeriod(+state.period||1)}}catch(e){}
+bindAuth();bindName();boot();fbInit();
+}
+</script>
+</body>
+</html>

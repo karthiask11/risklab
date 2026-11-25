@@ -559,6 +559,25 @@ def main():
             nifty.update({"tri": 1, "tri_src": src, "m": metrics(td, tv), "m30": metrics(*cut30(td, tv))})
     else:
         print("Nifty 50 download failed; beta will be blank")
+    indices = []
+    for tk, key, name in INDICES:  # extra benchmarks (price indices from Yahoo)
+        try:
+            idf = download([tk])
+            ix = closes(idf, tk) if idf is not None else None
+            if ix is None or len(ix) < 250:
+                print(f"Index {name}: not available")
+                continue
+            idd = [d.strftime("%Y-%m-%d") for d in ix.index]
+            idv = [round(float(v), 2) for v in ix.values]
+            idd, idv = drop_holidays(idd, idv)
+            fname = "_IDX_" + key
+            with open(os.path.join(OUT, fname + ".json"), "w", encoding="utf-8") as f:
+                json.dump({"s": name, "d": idd, "c": idv}, f, separators=(",", ":"))
+            indices.append({"key": key, "name": name, "file": fname, "last": idv[-1], "date": idd[-1],
+                            "m": metrics(idd, idv), "m30": metrics(*cut30(idd, idv))})
+            print(f"Index {name}: {len(idv)} days")
+        except Exception as e:  # noqa: BLE001
+            print(f"Index {name} failed: {e}")
     saved, failed, from_nse = [], [], 0
     for i in range(0, len(stocks), BATCH):
         part = stocks[i:i + BATCH]
@@ -607,12 +626,24 @@ def main():
     with open(os.path.join(OUT, "meta.json"), "w", encoding="utf-8") as f:
         json.dump({"updated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes"),
                    "count": len(saved), "failed": failed, "nse_date": nse_date, "nse_count": from_nse,
-                   "nifty": nifty,
+                   "nifty": nifty, "indices": indices,
                    "source": (f"Latest close: NSE bhavcopy {nse_date}. " if nse_date else "")
                              + "History: Yahoo Finance daily closes, split and bonus adjusted; demerger gaps removed; dividends added for total return"}, f)
     print(f"Saved {len(saved)} stocks ({from_nse} with NSE's official close). Failed: {len(failed)} {failed[:20]}")
 
 
+INDICES = [  # (Yahoo ticker, key, name) extra benchmarks
+    ("^CRSLDX", "N500", "Nifty 500"),
+    ("^NSMIDCP", "NEXT50", "Nifty Next 50"),
+    ("^NSEMDCP50", "MID50", "Nifty Midcap 50"),
+    ("^CNXSC", "SMALL100", "Nifty Smallcap 100"),
+    ("^NSEBANK", "BANK", "Nifty Bank"),
+    ("^CNXIT", "IT", "Nifty IT"),
+    ("^CNXPHARMA", "PHARMA", "Nifty Pharma"),
+    ("^CNXAUTO", "AUTO", "Nifty Auto"),
+    ("^CNXFMCG", "FMCG", "Nifty FMCG"),
+    ("^CNXMETAL", "METAL", "Nifty Metal"),
+]
 MKT = None  # Nifty 50 daily closes (pandas Series), set in main()
 
 
