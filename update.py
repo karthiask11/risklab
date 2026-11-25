@@ -262,6 +262,14 @@ def fix_jumps(dates, vals):
     return vals, adj[::-1]
 
 
+def file_date(df, col, default):
+    """The trading date written inside a bhavcopy file (NSE returns the previous file on holidays)."""
+    try:
+        return pd.to_datetime(str(df[col].dropna().iloc[0]).strip(), dayfirst=col == "DATE1").date()
+    except Exception:  # noqa: BLE001
+        return default
+
+
 def nse_closes():
     """Official closing prices from NSE's daily bhavcopy (end-of-day price file).
     Tries today and the previous days until a file is found.
@@ -285,6 +293,10 @@ def nse_closes():
                 with zipfile.ZipFile(io.BytesIO(r.content)) as z:
                     df = pd.read_csv(z.open(z.namelist()[0]))
                 df.columns = [c.strip() for c in df.columns]
+                fd = file_date(df, "TradDt", d)
+                if fd != d:  # market holiday: NSE serves the last trading day's file
+                    print(f"NSE file for {d} is dated {fd}; skipping")
+                    continue
                 df = df[df["SctySrs"].astype(str).str.strip().isin(["EQ", "BE", "BZ", "RR", "IV"])]
                 out = {str(k).strip(): float(v) for k, v in zip(df["TckrSymb"], df["ClsPric"]) if float(v) > 0}
                 if len(out) > 500:
@@ -299,6 +311,10 @@ def nse_closes():
             if r.ok and r.text.lstrip().upper().startswith("SYMBOL"):
                 df = pd.read_csv(io.StringIO(r.text))
                 df.columns = [c.strip() for c in df.columns]
+                fd = file_date(df, "DATE1", d)
+                if fd != d:
+                    print(f"NSE full file for {d} is dated {fd}; skipping")
+                    continue
                 df = df[df["SERIES"].astype(str).str.strip().isin(["EQ", "BE", "BZ", "RR", "IV"])]
                 out = {str(k).strip(): float(v) for k, v in zip(df["SYMBOL"], df["CLOSE_PRICE"]) if float(v) > 0}
                 if len(out) > 500:
