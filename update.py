@@ -499,11 +499,30 @@ def main():
         nifty = {"last": nv[-1], "date": nd[-1], "m": metrics(nd, nv), "m30": metrics(*cut30(nd, nv))}
         print(f"Nifty 50: {len(nv)} days")
         td, tv = nifty_tri(nd, nv)
+        src = "niftyindices.com"
+        if not td:  # NIFTYBEES reinvests dividends, so its price tracks the Nifty 50 Total Return Index
+            try:
+                e = download(["NIFTYBEES.NS"])
+                es = closes(e, "NIFTYBEES.NS") if e is not None else None
+                if es is not None and len(es) > 500:
+                    ed = [d.strftime("%Y-%m-%d") for d in es.index]
+                    ev = [float(v) for v in es.values]
+                    ed, ev = drop_holidays(ed, ev)
+                    ev, _, _ = fix_jumps(ed, ev)
+                    pv = dict(zip(nd, nv))
+                    base = next(d for d in ed if d in pv)
+                    k = pv[base] / ev[ed.index(base)]
+                    td = [d for d in ed if d >= base]
+                    tv = [round(ev[ed.index(d)] * k, 2) for d in td]
+                    src = "NIFTYBEES ETF (tracks Nifty 50 TRI)"
+                    print(f"Nifty 50 TRI from NIFTYBEES: {len(td)} days")
+            except Exception as ex:  # noqa: BLE001
+                print(f"NIFTYBEES fallback failed: {ex}")
         if td:
             with open(os.path.join(OUT, "_NIFTY50TRI.json"), "w", encoding="utf-8") as f:
                 json.dump({"s": "NIFTY 50 TRI", "d": td, "c": tv}, f, separators=(",", ":"))
             MKT = pd.Series(tv, index=pd.to_datetime(td))
-            nifty.update({"tri": 1, "m": metrics(td, tv), "m30": metrics(*cut30(td, tv))})
+            nifty.update({"tri": 1, "tri_src": src, "m": metrics(td, tv), "m30": metrics(*cut30(td, tv))})
     else:
         print("Nifty 50 download failed; beta will be blank")
     saved, failed, from_nse = [], [], 0

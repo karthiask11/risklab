@@ -5,13 +5,14 @@ service cloud.firestore {
     match /users/{uid}/portfolios/{pid} {
       allow read, delete: if request.auth != null && request.auth.uid == uid;
       allow create, update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name', 'holdings', 'mode', 'period', 'tx', 'created', 'updated'])
+        && request.resource.data.keys().hasOnly(['name', 'holdings', 'mode', 'period', 'tx', 'ips', 'created', 'updated'])
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
         && request.resource.data.name.size() <= 80
         && request.resource.data.holdings is list
         && request.resource.data.holdings.size() <= 100
-        && (!('tx' in request.resource.data) || (request.resource.data.tx is list && request.resource.data.tx.size() <= 1000));
+        && (!('tx' in request.resource.data) || (request.resource.data.tx is list && request.resource.data.tx.size() <= 1000))
+        && (!('ips' in request.resource.data) || request.resource.data.ips is map);
     }
     // Everything else is closed.
     match /{document=**} {
