@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Admin · Portfolio Risk Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0d1416);--ink:light-dark(#14161a,#e4ecec);--mute:light-dark(#5b6670,#93a4a8);--rule:light-dark(#dde3e5,#22343a);--soft:light-dark(#f2f6f6,#132026);--teal:light-dark(#0b5d63,#5cc0bc);--tealbg:light-dark(#e3f0ef,#123236);--red:light-dark(#b42318,#ff7b6e);--amber:light-dark(#8a5a00,#f0c36a);--band:light-dark(#0b5d63,#0f2a2e)}
+*{box-sizing:border-box;min-width:0}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
+h1,h2,.big{font-family:"Libre Caslon Text",Georgia,serif;letter-spacing:-.02em;line-height:1.1;margin:0}
+h1{font-size:26px}h2{font-size:20px;margin:0 0 12px}h3{font-size:15px;margin:18px 0 8px}
+.top{background:var(--band);color:#fff;padding:16px max(4vw,16px);display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;justify-content:space-between}
+.top a{color:#cfe5e3}.who{font-size:14px;color:#e6f2f1}
+nav.tabs{display:flex;gap:4px;flex-wrap:wrap;padding:10px max(4vw,16px);border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--bg);z-index:2}
+nav.tabs button{border:0;background:none;font:inherit;font-weight:600;color:var(--mute);padding:8px 14px;border-radius:999px;cursor:pointer}
+nav.tabs button[aria-selected=true]{background:var(--tealbg);color:var(--teal)}
+main{padding:20px max(4vw,16px) 60px;max-width:1200px;margin:0 auto}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15em),1fr));gap:12px;margin-bottom:18px}
+.card{border:1px solid var(--rule);border-radius:14px;padding:14px 16px;background:var(--soft)}
+.card .lab{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute)}
+.card .big{font-size:26px;margin:4px 0}.card .sub{font-size:13px;color:var(--mute)}
+.ok{color:var(--teal)}.warn{color:var(--amber)}.bad{color:var(--red)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.dot.ok{background:var(--teal)}.dot.warn{background:var(--amber)}.dot.bad{background:var(--red)}
+.scroll{overflow-x:auto;border:1px solid var(--rule);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);background:var(--soft);position:sticky;top:0}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+.btn{background:var(--teal);color:#fff;border:0;border-radius:10px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
+.btn.ghost{background:none;color:var(--teal);border:1px solid var(--teal)}
+.btn.sm{padding:5px 10px;font-size:13px}.btn.red{background:var(--red)}
+.btn:disabled{opacity:.5;cursor:default}
+input[type=text],input[type=email],input[type=password],textarea{font:inherit;padding:9px 11px;border:1px solid var(--rule);border-radius:10px;background:var(--bg);color:var(--ink);width:100%}
+textarea{min-height:70px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.note{font-size:13px;color:var(--mute)}
+.login{max-width:380px;margin:60px auto;display:grid;gap:10px;text-align:center}
+.chk{display:flex;gap:8px;align-items:center;padding:6px 0}
+.pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--tealbg);color:var(--teal);font-weight:600}
+.err{color:var(--red);font-size:14px;min-height:1.2em}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chips span{font-size:12px;background:var(--soft);border:1px solid var(--rule);border-radius:6px;padding:2px 6px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header class="top">
+  <div><h1>Admin</h1><div class="note" style="color:#cfe5e3">Portfolio Risk Lab · <a href="../" target="_blank" rel="noopener">open customer site ↗</a></div></div>
+  <div class="row" id="acct"></div>
+</header>
+<div id="app"><p class="login note">Loading…</p></div>
+<div class="toast" id="toast" role="status"></div>
+<script type="module">
+const FBCFG={apiKey:"AIzaSyC3ZYgWqcT0-tG7-lSlKzcM-9JEcnhB6OM",authDomain:"risklab---karthi.firebaseapp.com",projectId:"risklab---karthi",storageBucket:"risklab---karthi.firebasestorage.app",messagingSenderId:"78064528496",appId:"1:78064528496:web:8fef81fcb71999471b18b5"};
+const REPO="karthiask11/risklab",OWNER_EMAIL="stockanalysistamil@gmail.com";
+const FEATS=[["plan","Plan"],["portfolio","Portfolio"],["perf","Performance"],["screen","Screener"],["single","One stock"],["pair","Two stocks"],["learn","Formulas"]];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove("on"),2600)};
+const ago=d=>{if(!d)return "—";const s=(Date.now()-d.getTime())/1000;if(s<90)return "just now";if(s<5400)return Math.round(s/60)+" min ago";if(s<172800)return Math.round(s/3600)+" h ago";return Math.round(s/86400)+" days ago"};
+const dt=d=>d?d.toLocaleString("en-IN",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
+const tsd=t=>t&&t.toDate?t.toDate():null;
+const B="https://www.gstatic.com/firebasejs/10.12.2/";
+let app,A,F;
+try{[app,A,F]=await Promise.all([import(B+"firebase-app.js"),import(B+"firebase-auth.js"),import(B+"firebase-firestore.js")])}
+catch(e){$("#app").innerHTML=`<div class="login"><h2>Could not load sign-in</h2><p class="note">Check your internet connection and refresh.</p></div>`;throw e}
+const fa=app.initializeApp(FBCFG),auth=A.getAuth(fa),db=F.getFirestore(fa);
+let user=null,tab="data",unsub=[],USERS=[],COUNTS={},SITE={gated:[],banner:""},ADMINS=[],timer=null;
+
+function loginView(msg){
+  $("#acct").innerHTML="";
+  $("#app").innerHTML=`<div class="login"><h2>Admin sign in</h2>
+    <button class="btn" id="g">Sign in with Google</button>
+    <div class="note">or with email</div>
+    <input type="email" id="em" placeholder="Email" autocomplete="username"><input type="password" id="pw" placeholder="Password" autocomplete="current-password">
+    <button class="btn ghost" id="e">Sign in</button><div class="err" id="err">${esc(msg||"")}</div>
+    <p class="note">Only admin accounts can open this page. Customers sign in on the main site.</p></div>`;
+  $("#g").onclick=async()=>{try{await A.signInWithPopup(auth,new A.GoogleAuthProvider())}catch(e){$("#err").textContent=e.code==="auth/unauthorized-domain"?"Add this website to Firebase → Authentication → Authorized domains.":e.message}};
+  $("#e").onclick=async()=>{try{await A.signInWithEmailAndPassword(auth,$("#em").value.trim(),$("#pw").value)}catch(e){$("#err").textContent="Wrong email or password."}};
+}
+async function isAdmin(u){
+  if(u.email===OWNER_EMAIL&&u.emailVerified)return true;
+  try{return (await F.getDoc(F.doc(db,"admins",u.uid))).exists()}catch(e){return false}
+}
+A.onAuthStateChanged(auth,async u=>{
+  unsub.forEach(f=>f());unsub=[];clearInterval(timer);user=u;
+  if(!u)return loginView();
+  if(!(await isAdmin(u))){loginView(`${u.email} is not an admin.`);$("#acct").innerHTML=`<button class="btn ghost sm" id="so" style="color:#fff;border-color:#fff">Sign out</button>`;$("#so").onclick=()=>A.signOut(auth);return}
+  $("#acct").innerHTML=`<span class="who">${esc(u.email)}</span><button class="btn ghost sm" id="so" style="color:#fff;border-color:#fff">Sign out</button>`;
+  $("#so").onclick=()=>A.signOut(auth);
+  shell();watch();
+  timer=setInterval(()=>{if(tab==="data")drawData();counts()},5*60*1000);
+});
+function shell(){
+  const T=[["data","Data feeds"],["users","Users"],["saved","Saved work"],["settings","Site settings"],["admins","Admins"]];
+  $("#app").innerHTML=`<nav class="tabs" role="tablist">${T.map(([k,l])=>`<button role="tab" data-t="${k}" aria-selected="${k===tab}">${l}</button>`).join("")}</nav><main id="body"></main>`;
+  document.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{tab=b.dataset.t;document.querySelectorAll("[data-t]").forEach(x=>x.setAttribute("aria-selected",x===b));draw()});
+  draw();
+}
+function draw(){({data:drawData,users:drawUsers,saved:drawSaved,settings:drawSettings,admins:drawAdmins})[tab]()}
+
+/* live Firestore listeners: everything updates by itself */
+function watch(){
+  unsub.push(F.onSnapshot(F.collection(db,"users"),s=>{USERS=s.docs.map(d=>({id:d.id,...d.data()}));if(tab==="users")drawUsers()},e=>console.warn(e)));
+  unsub.push(F.onSnapshot(F.doc(db,"site","config"),d=>{const c=d.exists()?d.data():{};SITE={gated:Array.isArray(c.gated)?c.gated:["plan","portfolio","perf","screen","single","pair"],banner:c.banner||"",updated:tsd(c.updated),by:c.by||""};if(tab==="settings")drawSettings()}));
+  unsub.push(F.onSnapshot(F.collection(db,"admins"),s=>{ADMINS=s.docs.map(d=>({id:d.id,...d.data()}));if(tab==="admins"||tab==="users")draw()},()=>{}));
+  counts();
+}
+async function counts(){
+  const C={};
+  for(const n of ["portfolios","plans","reports"]){
+    try{const s=await F.getDocs(F.query(F.collectionGroup(db,n),F.limit(5000)));
+      s.docs.forEach(d=>{const u=d.ref.parent.parent.id;(C[u]??={portfolios:0,plans:0,reports:0,last:null})[n]++;
+        const t=tsd(d.data().updated)||tsd(d.data().created);if(t&&(!C[u].last||t>C[u].last))C[u].last=t;
+        (C._items??=[]).push({kind:n,uid:u,id:d.id,name:d.data().name||"",sub:d.data().kind||"",t})})}catch(e){console.warn(n,e)}
+  }
+  COUNTS=C;if(tab==="users"||tab==="saved"||tab==="data")draw();
+}
+
+/* ---------- data feeds (from GitHub Actions + NSE/Yahoo/IIMA files) ---------- */
+const j=u=>fetch(u,{cache:"no-cache"}).then(r=>r.ok?r.json():null).catch(()=>null);
+function health(d,okH,warnH){if(!d)return "bad";const h=(Date.now()-d.getTime())/36e5;return h<=okH?"ok":h<=warnH?"warn":"bad"}
+async function drawData(){
+  const el=$("#body");if(!el.dataset.ready)el.innerHTML=`<p class="note">Reading the data files…</p>`;
+  const [meta,fund,live,runs]=await Promise.all([j("../data/meta.json"),j("../data/fund.json"),j(`https://raw.githubusercontent.com/${REPO}/live/live.json?t=${Date.now()}`),j(`https://api.github.com/repos/${REPO}/actions/runs?per_page=12`)]);
+  if(tab!=="data")return;el.dataset.ready=1;
+  const mu=meta&&new Date(meta.updated),fu=fund&&new Date(fund.updated),lu=live&&live.t?new Date(live.t):null;
+  const nU=USERS.length,nP=Object.values(COUNTS).filter(x=>x&&x.portfolios!=null).reduce((a,x)=>a+x.portfolios,0);
+  const card=(lab,big,sub,h)=>`<div class="card"><div class="lab">${h?`<span class="dot ${h}"></span>`:""}${lab}</div><div class="big">${big}</div><div class="sub">${sub}</div></div>`;
+  el.innerHTML=`<h2>Data feeds</h2><p class="note">These update on their own: prices every evening (8:30 pm IST), live prices every 15 minutes in market hours. The customer site reads the same files, so both sites always show the same data. This page refreshes every 5 minutes.</p>
+  <div class="cards">
+    ${card("Daily prices (NSE + Yahoo)",meta?meta.count.toLocaleString("en-IN")+" stocks":"missing",meta?`Updated ${ago(mu)} · NSE close ${esc(meta.nse_date)}`:"meta.json not found",health(mu,30,54))}
+    ${card("Live prices",lu?ago(lu):"—",live?`${live.n||0} quotes on ${esc(live.d||"")} · runs only in market hours`:"live.json not found",lu?health(lu,0.5,90):"warn")}
+    ${card("Fundamentals",fund?Object.keys(fund.f).length+" stocks":"missing",fund?`Updated ${ago(fu)} · about 300 refresh a day`:"fund.json not found",health(fu,30,80))}
+    ${card("Fama-French (IIMA)",meta&&meta.ff?esc(meta.ff.to):"—",meta&&meta.ff?`File ${esc(meta.ff.file||"")}`:"not loaded",meta&&meta.ff?"ok":"warn")}
+    ${card("Benchmark indices",meta&&meta.indices?meta.indices.length+" + Nifty 50":"—",meta&&meta.indices?esc(meta.indices.map(x=>x.name||x.key||x).join(", ")):"",meta&&meta.indices?"ok":"warn")}
+    ${card("Users",nU,`${nP} saved portfolios`,"")}
+  </div>
+  <div class="row" style="justify-content:space-between"><h3>Automatic update jobs (GitHub Actions)</h3><a class="btn ghost sm" href="https://github.com/${REPO}/actions" target="_blank" rel="noopener">Open in GitHub ↗</a></div>
+  ${runs&&runs.workflow_runs?`<div class="scroll"><table><thead><tr><th>Job</th><th>Result</th><th>Started</th><th>Trigger</th><th></th></tr></thead><tbody>${runs.workflow_runs.map(r=>{const c=r.status!=="completed"?"warn":r.conclusion==="success"?"ok":"bad";return `<tr><td>${esc(r.name)}</td><td><span class="dot ${c}"></span>${esc(r.status!=="completed"?r.status:r.conclusion)}</td><td>${dt(new Date(r.run_started_at||r.created_at))}</td><td>${esc(r.event)}</td><td><a href="${esc(r.html_url)}" target="_blank" rel="noopener">log ↗</a></td></tr>`}).join("")}</tbody></table></div>`:`<p class="note">GitHub did not answer (it allows 60 checks an hour). Try again later.</p>`}
+  ${meta&&meta.failed&&meta.failed.length?`<h3>Stocks that failed in the last update (${meta.failed.length})</h3><p class="note">Usually new listings, suspended or renamed stocks. They retry every evening.</p><div class="chips">${meta.failed.map(s=>`<span>${esc(s)}</span>`).join("")}</div>`:""}
+  ${meta?`<h3>Source</h3><p class="note">${esc(meta.source||"")}</p>`:""}`;
+}
+
+/* ---------- users ---------- */
+function drawUsers(){
+  const el=$("#body"),q=(el.querySelector("#uq")||{}).value||"";
+  const adm=new Set(ADMINS.map(a=>a.id));
+  const rows=USERS.filter(u=>!q||(u.email+" "+u.name).toLowerCase().includes(q.toLowerCase())).sort((a,b)=>(tsd(b.lastLogin)||0)-(tsd(a.lastLogin)||0));
+  const c=u=>COUNTS[u]||{portfolios:0,plans:0,reports:0,last:null};
+  const week=USERS.filter(u=>{const t=tsd(u.lastLogin);return t&&Date.now()-t<7*864e5}).length;
+  el.innerHTML=`<h2>Users</h2>
+  <div class="cards"><div class="card"><div class="lab">All users</div><div class="big">${USERS.length}</div><div class="sub">signed up</div></div>
+  <div class="card"><div class="lab">Active</div><div class="big">${week}</div><div class="sub">signed in during the last 7 days</div></div>
+  <div class="card"><div class="lab">New</div><div class="big">${USERS.filter(u=>{const t=tsd(u.created);return t&&Date.now()-t<30*864e5}).length}</div><div class="sub">joined in the last 30 days</div></div></div>
+  <div class="row" style="margin-bottom:10px"><input type="text" id="uq" placeholder="Search email or name" value="${esc(q)}" style="max-width:320px"><button class="btn ghost sm" id="csv">Download CSV</button></div>
+  <div class="scroll"><table><thead><tr><th>Email</th><th>Name</th><th>Joined</th><th>Last sign-in</th><th class="n">Portfolios</th><th class="n">Plans</th><th class="n">Reports</th><th></th></tr></thead><tbody>
+  ${rows.map(u=>`<tr><td>${esc(u.email)} ${adm.has(u.id)||u.email===OWNER_EMAIL?'<span class="pill">admin</span>':""}</td><td>${esc(u.name)}</td><td>${dt(tsd(u.created))}</td><td>${ago(tsd(u.lastLogin))}</td><td class="n">${c(u.id).portfolios}</td><td class="n">${c(u.id).plans}</td><td class="n">${c(u.id).reports}</td>
+    <td>${adm.has(u.id)?"":`<button class="btn ghost sm" data-mk="${esc(u.id)}">Make admin</button>`}</td></tr>`).join("")||`<tr><td colspan="8" class="note">No users yet. A user appears here after they sign in once on the customer site.</td></tr>`}
+  </tbody></table></div><p class="note">Users who signed in before this update appear after their next sign-in.</p>`;
+  const i=$("#uq");i.oninput=()=>{const p=i.selectionStart;drawUsers();const n=$("#uq");n.focus();n.setSelectionRange(p,p)};
+  $("#csv").onclick=()=>{const L=[["email","name","joined","last_sign_in","portfolios","plans","reports"],...USERS.map(u=>[u.email,u.name,dt(tsd(u.created)),dt(tsd(u.lastLogin)),c(u.id).portfolios,c(u.id).plans,c(u.id).reports])];
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([L.map(r=>r.map(x=>`"${String(x??"").replace(/"/g,'""')}"`).join(",")).join("\n")],{type:"text/csv"}));a.download="risklab-users.csv";a.click()};
+  el.querySelectorAll("[data-mk]").forEach(b=>b.onclick=async()=>{const u=USERS.find(x=>x.id===b.dataset.mk);if(!confirmTwice(b,"Tap again to confirm"))return;
+    try{await F.setDoc(F.doc(db,"admins",u.id),{email:u.email||"",added:F.serverTimestamp(),by:user.email});toast(u.email+" is now an admin")}catch(e){toast("Not saved: "+e.code)}});
+}
+function confirmTwice(b,msg){if(b.dataset.arm&&Date.now()-b.dataset.arm<4000)return true;b.dataset.arm=Date.now();b.textContent=msg;return false}
+
+/* ---------- saved work across all users ---------- */
+function drawSaved(){
+  const el=$("#body"),em=Object.fromEntries(USERS.map(u=>[u.id,u.email]));
+  const items=(COUNTS._items||[]).slice().sort((a,b)=>(b.t||0)-(a.t||0)).slice(0,200);
+  const K={portfolios:"Portfolio",plans:"Plan",reports:"Report"};
+  const n=k=>(COUNTS._items||[]).filter(x=>x.kind===k).length;
+  el.innerHTML=`<h2>Saved work</h2><div class="cards">${Object.entries(K).map(([k,l])=>`<div class="card"><div class="lab">${l}s</div><div class="big">${n(k)}</div><div class="sub">saved by users</div></div>`).join("")}</div>
+  <div class="row" style="justify-content:space-between"><h3>Latest 200</h3><button class="btn ghost sm" id="rf">Refresh</button></div>
+  <div class="scroll"><table><thead><tr><th>When</th><th>Type</th><th>Name</th><th>User</th></tr></thead><tbody>
+  ${items.map(x=>`<tr><td>${dt(x.t)}</td><td>${K[x.kind]}${x.sub?` · ${esc(x.sub==="perf"?"performance":x.sub)}`:""}</td><td>${esc(x.name)}</td><td>${esc(em[x.uid]||x.uid)}</td></tr>`).join("")||`<tr><td colspan="4" class="note">Nothing saved yet.</td></tr>`}
+  </tbody></table></div><p class="note">You can see names and counts here. Users' figures stay private to them.</p>`;
+  $("#rf").onclick=()=>{counts();toast("Refreshing…")};
+}
+
+/* ---------- site settings: change here, customer site changes at once ---------- */
+function drawSettings(){
+  const el=$("#body");
+  el.innerHTML=`<h2>Site settings</h2><p class="note">Changes reach every open customer page within a second or two. No new deploy is needed.</p>
+  <h3>Features that need sign-in</h3><p class="note">Ticked features show a 🔒 on the home page. Visitors must sign in to use them.</p>
+  ${FEATS.map(([k,l])=>`<label class="chk"><input type="checkbox" value="${k}" ${SITE.gated.includes(k)?"checked":""}> ${l}</label>`).join("")}
+  <h3>Notice banner</h3><p class="note">Shown at the top of every customer page. Leave empty to hide it.</p>
+  <textarea id="ban" maxlength="300" placeholder="Example: Prices update after 8:30 pm IST today.">${esc(SITE.banner)}</textarea>
+  <div class="row" style="margin-top:12px"><button class="btn" id="sv">Save settings</button><span class="note">${SITE.updated?`Last saved ${ago(SITE.updated)} by ${esc(SITE.by)}`:"Using default settings"}</span></div>`;
+  $("#sv").onclick=async()=>{const g=[...el.querySelectorAll(".chk input:checked")].map(x=>x.value);
+    try{await F.setDoc(F.doc(db,"site","config"),{gated:g,banner:$("#ban").value.trim().slice(0,300),updated:F.serverTimestamp(),by:user.email});toast("Saved. The customer site is updated.")}catch(e){toast("Not saved: "+e.code)}};
+}
+
+/* ---------- admins ---------- */
+function drawAdmins(){
+  const el=$("#body");
+  el.innerHTML=`<h2>Admins</h2><p class="note">${esc(OWNER_EMAIL)} is always an admin. Add more from the Users tab (they must sign in once first).</p>
+  <div class="scroll"><table><thead><tr><th>Email</th><th>Added</th><th>By</th><th></th></tr></thead><tbody>
+  <tr><td>${esc(OWNER_EMAIL)} <span class="pill">owner</span></td><td>—</td><td>—</td><td></td></tr>
+  ${ADMINS.map(a=>`<tr><td>${esc(a.email)}</td><td>${dt(tsd(a.added))}</td><td>${esc(a.by)}</td><td>${a.id===user.uid?"":`<button class="btn red sm" data-rm="${esc(a.id)}">Remove</button>`}</td></tr>`).join("")}
+  </tbody></table></div>`;
+  el.querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{if(!confirmTwice(b,"Tap again to remove"))return;try{await F.deleteDoc(F.doc(db,"admins",b.dataset.rm));toast("Removed")}catch(e){toast("Not removed: "+e.code)}});
+}
+</script>
+</body>
+</html>

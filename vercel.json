@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "cleanUrls": true,
+  "trailingSlash": true,
+  "git": { "deploymentEnabled": { "live": false } },
+  "headers": [
+    { "source": "/data/(.*)", "headers": [ { "key": "Cache-Control", "value": "public, max-age=300, must-revalidate" } ] },
+    { "source": "/admin/(.*)", "headers": [ { "key": "X-Robots-Tag", "value": "noindex" }, { "key": "Cache-Control", "value": "no-cache" } ] },
+    { "source": "/(.*)", "headers": [
+      { "key": "X-Content-Type-Options", "value": "nosniff" },
+      { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+      { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" }
+    ] }
+  ]
+}

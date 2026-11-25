@@ -366,6 +366,28 @@ def extra_stocks():
     return rows
 
 
+def shard_of(sym):
+    c = sym[:1].upper()
+    return c if "A" <= c <= "Z" else "0"
+
+
+def split_for_site(saved):
+    """The website loads only what it needs: a light search list (symbol, name, sector, flags),
+    the Nifty 500 with full numbers, and the rest in small files by first letter, fetched on demand."""
+    os.makedirs(os.path.join(OUT, "u"), exist_ok=True)
+    rows = [[x["sym"], x["name"], x.get("ind", ""), 1 if x.get("n5") else 0, x.get("k", "")] for x in saved]
+    with open(os.path.join(OUT, "list.json"), "w", encoding="utf-8") as f:
+        json.dump({"f": ["sym", "name", "ind", "n5", "k"], "r": rows}, f, separators=(",", ":"))
+    with open(os.path.join(OUT, "u", "n5.json"), "w", encoding="utf-8") as f:
+        json.dump([x for x in saved if x.get("n5")], f, separators=(",", ":"))
+    groups = {}
+    for x in saved:
+        groups.setdefault(shard_of(x["sym"]), []).append(x)
+    for k, v in groups.items():
+        with open(os.path.join(OUT, "u", k + ".json"), "w", encoding="utf-8") as f:
+            json.dump(v, f, separators=(",", ":"))
+
+
 def column(df, ticker, name):
     try:
         if isinstance(df.columns, pd.MultiIndex):
@@ -640,6 +662,7 @@ def main():
     saved.sort(key=lambda x: x["name"].lower())
     with open(os.path.join(OUT, "stocks.json"), "w", encoding="utf-8") as f:
         json.dump({"stocks": saved}, f, separators=(",", ":"))
+    split_for_site(saved)
     with open(os.path.join(OUT, "meta.json"), "w", encoding="utf-8") as f:
         json.dump({"updated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes"),
                    "count": len(saved), "failed": failed, "nse_date": nse_date, "nse_count": from_nse,

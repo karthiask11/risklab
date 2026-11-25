@@ -1,22 +1,65 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Each signed-in user can read and write only their own portfolios.
-    match /users/{uid}/portfolios/{pid} {
-      allow read, delete: if request.auth != null && request.auth.uid == uid;
-      allow create, update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name', 'holdings', 'mode', 'period', 'tx', 'ips', 'created', 'updated'])
-        && request.resource.data.name is string
-        && request.resource.data.name.size() > 0
-        && request.resource.data.name.size() <= 80
-        && request.resource.data.holdings is list
-        && request.resource.data.holdings.size() <= 100
-        && (!('tx' in request.resource.data) || (request.resource.data.tx is list && request.resource.data.tx.size() <= 1000))
-        && (!('ips' in request.resource.data) || request.resource.data.ips is map);
+    function signedIn() { return request.auth != null; }
+    function owner(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() {
+      return signedIn() && (
+        (request.auth.token.email == 'stockanalysistamil@gmail.com' && request.auth.token.email_verified == true)
+        || exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
     }
-    // Everything else is closed.
-    match /{document=**} {
-      allow read, write: if false;
+    function okName(d) { return d.name is string && d.name.size() > 0 && d.name.size() <= 80; }
+
+    // Site settings: everyone reads (banner, which features need sign-in); only admins change them.
+    match /site/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
+    // Admin list.
+    match /admins/{uid} {
+      allow read: if isAdmin() || owner(uid);
+      allow write: if isAdmin();
+    }
+    // A user's profile and saved work: the user, and admins may read.
+    match /users/{uid} {
+      allow read: if owner(uid) || isAdmin();
+      allow delete: if owner(uid);
+      allow create, update: if owner(uid)
+        && request.resource.data.keys().hasOnly(['email', 'name', 'created', 'lastLogin'])
+        && request.resource.data.email is string && request.resource.data.email.size() <= 200
+        && request.resource.data.name is string && request.resource.data.name.size() <= 80;
+
+      match /portfolios/{pid} {
+        allow read: if owner(uid) || isAdmin();
+        allow delete: if owner(uid);
+        allow create, update: if owner(uid)
+          && request.resource.data.keys().hasOnly(['name', 'holdings', 'mode', 'period', 'tx', 'ips', 'created', 'updated'])
+          && okName(request.resource.data)
+          && request.resource.data.holdings is list
+          && request.resource.data.holdings.size() <= 100
+          && (!('tx' in request.resource.data) || (request.resource.data.tx is list && request.resource.data.tx.size() <= 1000))
+          && (!('ips' in request.resource.data) || request.resource.data.ips is map);
+      }
+      match /plans/{id} {
+        allow read: if owner(uid) || isAdmin();
+        allow delete: if owner(uid);
+        allow create, update: if owner(uid)
+          && request.resource.data.keys().hasOnly(['name', 'ips', 'created', 'updated'])
+          && okName(request.resource.data) && request.resource.data.ips is map;
+      }
+      match /reports/{id} {
+        allow read: if owner(uid) || isAdmin();
+        allow delete: if owner(uid);
+        allow create: if owner(uid)
+          && request.resource.data.keys().hasOnly(['name', 'kind', 'data', 'created'])
+          && okName(request.resource.data)
+          && request.resource.data.kind in ['portfolio', 'perf']
+          && request.resource.data.data is map && request.resource.data.data.size() <= 30;
+      }
+    }
+    // Admin pages read across all users (collection group queries).
+    match /{path=**}/portfolios/{pid} { allow read: if isAdmin(); }
+    match /{path=**}/plans/{id} { allow read: if isAdmin(); }
+    match /{path=**}/reports/{id} { allow read: if isAdmin(); }
   }
 }

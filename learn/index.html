@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<script>(function(){var m=location.pathname.match(/^(.*\/)(?:plan|portfolio|perf|pair|single|screen|learn)\/?(?:index\.html)?$/);var b=m?m[1]:location.pathname.replace(/[^\/]*$/,"");document.write('<base href="'+b+'">');window.BASE=b})();</script>
+<script>(function(){var m=location.pathname.match(/^(.*\/)(?:plan|portfolio|perf|pair|single|screen|learn|mine)\/?(?:index\.html)?$/);var b=m?m[1]:location.pathname.replace(/[^\/]*$/,"");document.write('<base href="'+b+'">');window.BASE=b})();</script>
 <title>Portfolio Risk Lab</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -139,6 +139,12 @@ footer{background:var(--soft);line-height:1.6}
 @keyframes fadein{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){#main{animation:none}.panel,.road a{transition:none}}
 .newtag{display:inline-block;margin-left:6px;font:600 11px Inter,sans-serif;color:#8a4b00;background:#fff1d6;border:1px solid #f0c36a;border-radius:999px;padding:1px 7px;vertical-align:middle}
+.kv{font-size:13px;color:var(--mute)}.kv b{color:var(--ink)}
+.feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,13em),1fr));gap:12px}
+.fbtn{display:grid;gap:4px;padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,var(--tealbg),var(--soft));border:1px solid var(--rule);text-decoration:none;color:var(--ink);transition:transform .15s,box-shadow .15s}
+.fbtn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(11,93,99,.14)}.fbtn b{font-size:17px}.fbtn span{font-size:13px;color:var(--mute)}.lock{font-size:13px}
+.gate{max-width:640px;margin:20px auto;text-align:center;padding:28px}.gate h2{border:0!important;padding-left:0!important}.gate h2::before{display:none}
+.sitebanner{background:#fff4d6;color:#5a3d00;border-bottom:1px solid #f0c36a;padding:10px max(5vw,16px);font-size:14px}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22em),1fr));gap:20px;align-items:start}
 .hero{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:28px;align-items:center}
 .hero h2{font-size:clamp(32px,4.4vw,50px);margin-bottom:14px}
@@ -190,6 +196,7 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
     </div>
   </div>
 </header>
+<div id="siteBanner" class="sitebanner" hidden></div>
 <main id="main"></main>
 <footer>Portfolio Risk Lab · a free, non-commercial student project for learning portfolio maths · <b>Not investment advice.</b> The maker is not registered with SEBI as an investment adviser or research analyst; nothing here is a recommendation to buy or sell. Results use past data and do not predict the future. Built with the help of AI (Claude). Prices: NSE bhavcopy and Yahoo Finance, about 15 minutes delayed during market hours. ·
 <button class="add" id="privBtn" type="button" style="border:0;padding:0">Privacy</button> · <button class="add" id="eduBtn" type="button" style="border:0;padding:0">Education mode</button></footer>
@@ -245,6 +252,10 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
       <div class="fig" id="hfig" style="min-height:300px"><svg role="img" aria-label="Risk and return of every stock"></svg></div>
       <p class="note" id="hnote"></p>
     </div>
+  </section>
+  <section>
+    <h2>Start here</h2>
+    <div class="feat" id="featBtns"></div>
   </section>
   <section>
     <h2>The portfolio management process, start to end</h2>
@@ -367,6 +378,11 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
   <div id="sstats" style="margin-top:18px;max-width:760px"></div>
 </template>
 
+<template id="t-mine">
+  <h2>My saved work</h2>
+  <div id="mineBody"></div>
+</template>
+
 <template id="t-perf">
   <section class="panel soft">
     <div id="cloud"></div>
@@ -430,7 +446,8 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
   <section style="margin-top:22px">
     <h2>Step 4 · Investment Policy Statement (IPS)</h2>
     <div id="ips" class="panel"></div>
-    <p class="noprint" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="button" onclick="window.print()">Print / save as PDF</button><a class="btn ghost" href="screen/" data-v="screen" style="display:inline-flex;align-items:center;text-decoration:none">Next: select stocks →</a></p>
+    <div id="myPlans" style="margin-top:14px"></div>
+    <p class="noprint" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="button" id="savePlan">Save plan to my account</button><button class="add" type="button" onclick="window.print()">Print</button><a class="btn ghost" href="screen/" data-v="screen" style="display:inline-flex;align-items:center;text-decoration:none">Next: select stocks →</a></p>
   </section>
 </template>
 
@@ -497,22 +514,35 @@ const nm=s=>STOCKS[s]?STOCKS[s].name:s;
 const cleanSym=s=>String(s||"").trim().toUpperCase().replace(/[^A-Z0-9&\-]/g,"").slice(0,20);
 
 /* ---------- data ---------- */
+const fileOf=s=>s.replace(/[^A-Za-z0-9-]/g,"_"),shardOf=s=>{const c=s.slice(0,1).toUpperCase();return c>="A"&&c<="Z"?c:"0"};
+const SHARDS={};
+/* load the full numbers (metrics, price, liquidity) for these symbols only: one small file per first letter */
+function ensureInfo(syms){
+  const need=[...new Set(syms.filter(s=>s&&STOCKS[s]&&!STOCKS[s].m&&!s.startsWith("^")).map(shardOf))];
+  return Promise.allSettled(need.map(k=>SHARDS[k]??=fetch("data/u/"+k+".json",{cache:"no-cache"}).then(r=>r.ok?r.json():[]).catch(()=>[]).then(a=>{for(const x of a)if(STOCKS[x.sym])Object.assign(STOCKS[x.sym],x);for(const x of LIST)if(!x.m&&shardOf(x.sym)===k)x.m={}})));
+}
+const lastDate=()=>{let d="";for(const x of LIST)if(x.date&&x.date>d)d=x.date;return d||(meta&&meta.nse_date)||""};
 async function boot(){
   try{
-    const r=await fetch("data/stocks.json",{cache:"no-cache"});if(!r.ok)throw 0;
-    LIST=(await r.json()).stocks;
-    try{meta=await (await fetch("data/meta.json",{cache:"no-cache"})).json()}catch(e){}
+    /* light search list for every stock; full numbers only for the Nifty 500 now, the rest on demand */
+    const [rl,rn,rm]=await Promise.all(["data/list.json","data/u/n5.json","data/meta.json"].map(u=>fetch(u,{cache:"no-cache"})));
+    if(!rl.ok)throw 0;
+    const L0=await rl.json();LIST=L0.r.map(r=>({sym:r[0],name:r[1],ind:r[2]||"",n5:r[3]||0,k:r[4]||"",file:fileOf(r[0])}));
+    STOCKS=Object.fromEntries(LIST.map(x=>[x.sym,x]));
+    if(rn.ok)for(const x of await rn.json())if(STOCKS[x.sym])Object.assign(STOCKS[x.sym],x);
+    if(rm.ok)try{meta=await rm.json()}catch(e){}
+    await ensureInfo([...state.holdings.map(h=>h.sym),state.single,state.pairA,state.pairB,...(state.tx||[]).map(x=>x.sym)]);
   }catch(e){
     sample=true;
     for(const s in SAMPLE.px)store[s]=SAMPLE.dates.map((d,i)=>[d,SAMPLE.px[s][i]]);
     LIST=Object.keys(SAMPLE.px).map(s=>{const p=SAMPLE.px[s],A=align([s],1),S=stats(A.px[0],A.ret[0],A.dates);
       return {sym:s,name:SAMPLE.names[s],ind:SAMPLE.inds[s],last:p.at(-1),date:SAMPLE.dates.at(-1),chg:p.at(-1)/p.at(-2)-1,m:{1:[S.ar,S.ak,S.pr,S.cagr]}}});
   }
-  STOCKS=Object.fromEntries(LIST.map(x=>[x.sym,x]));
+  if(sample)STOCKS=Object.fromEntries(LIST.map(x=>[x.sym,x]));
   if(meta&&Array.isArray(meta.indices))for(const x of meta.indices)STOCKS["^"+x.key]={sym:"^"+x.key,name:x.name,file:x.file,ind:"Index",last:x.last,date:x.date,m:x.m,m30:x.m30};
   if(meta&&meta.nifty)STOCKS[NIFTY]={sym:NIFTY,name:meta.nifty.tri?"Nifty 50 TRI":"Nifty 50",file:meta.nifty.tri?"_NIFTY50TRI":"_NIFTY50",ind:"Index",last:meta.nifty.last,date:meta.nifty.date,m:meta.nifty.m,m30:meta.nifty.m30};
   IDX=state.bench&&STOCKS[state.bench]?state.bench:NIFTY;
-  if(state.edu){const d=new Date(LIST.map(x=>x.date).sort().at(-1)+"T00:00:00Z");d.setUTCDate(d.getUTCDate()-30);EDU_CUT=d.toISOString().slice(0,10)}
+  if(state.edu){const d=new Date(lastDate()+"T00:00:00Z");d.setUTCDate(d.getUTCDate()-30);EDU_CUT=d.toISOString().slice(0,10)}
   status();route();
   fetch("data/fund.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.f){FUND=j.f;const v=curView();if(["single","screen"].includes(v))route()}}).catch(()=>{});
   if(!sample&&!state.edu){loadLive();setInterval(()=>{if(!document.hidden)loadLive()},5*60*1000)}
@@ -523,7 +553,7 @@ let LIVE=null;
 async function loadLive(){
   try{
     const r=await fetch(LIVE_URL+"?t="+Math.floor(Date.now()/6e4),{cache:"no-store"});if(!r.ok)return;
-    const L=await r.json(),daily=LIST.map(x=>x.date).sort().at(-1);
+    const L=await r.json(),daily=lastDate();
     const fresh=L.d>daily||(L.d===daily&&meta&&meta.updated&&Date.parse(L.t)>Date.parse(meta.updated));
     if(!fresh||!L.p)return;
     const first=!LIVE;LIVE=L;
@@ -694,7 +724,7 @@ function status(){
   const s=$("#status");
   if(EDU_CUT){s.innerHTML=`<b>Education mode</b> · ${LIST.length} NSE stocks · data up to ${esc(fmtD(EDU_CUT))} (SEBI 30-day rule) · <button class="add" id="eduOff" type="button" style="padding:0 8px">Turn off</button>`;$("#eduOff").onclick=()=>setEdu(false);return}
   if(sample){s.innerHTML="<b>Sample data</b> · TCS, INFY, HDFCBANK to 23 Nov 2026";return}
-  const last=LIST.map(x=>x.date).sort().at(-1);
+  const last=lastDate();
   const nse=meta&&meta.nse_date?` · official NSE close for ${esc(fmtD(meta.nse_date))}`:"";
   if(LIVE){const tm=new Date(LIVE.t).toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",timeZone:"Asia/Kolkata"}),nf=LIVE.nifty?` · Nifty 50 ${num(LIVE.nifty[0],0)} <span class="${cls(LIVE.nifty[1])}">${LIVE.nifty[1]>=0?"+":""}${pct(LIVE.nifty[1],2)}</span>`:"";
     s.innerHTML=`<b>${LIST.length} NSE stocks</b> · <b>market prices at ${esc(tm)}</b> (about 15 min delayed, refresh every 15 min)${nf} · risk and return use daily closes`;return}
@@ -705,7 +735,7 @@ function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setIt
 function needs(syms,box,go){
   const t=++token;
   box.innerHTML=`<p class="load">Loading prices for ${esc(syms.join(", "))}…</p>`;
-  Promise.allSettled(syms.map(ensure)).then(res=>{
+  ensureInfo(syms).then(()=>Promise.allSettled(syms.map(ensure))).then(res=>{
     if(t!==token)return;
     const bad=res.map((r,i)=>r.status==="rejected"?(r.reason&&r.reason.message||syms[i]+": failed"):null).filter(Boolean);
     const ok=syms.filter((s,i)=>res[i].status==="fulfilled"&&store[s]&&adjusted(store[s]).length>1);
@@ -814,10 +844,11 @@ function renderPortfolio(){
         <tr><td>Sharpe = (${pct(P.ret,2)} − ${pct(rf,2)}) ÷ ${pct(P.risk,2)}</td><td class="n">${psh.toFixed(3)}</td></tr>
         <tr><td>Beta = Σ weight × stock beta</td><td class="n">${Number.isFinite(pb)?pb.toFixed(3):"–"}</td></tr>
       </tbody></table></div></details>
-      <p style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost" id="csvBtn" type="button">Download results for Excel (CSV)</button><button class="btn ghost" type="button" onclick="window.print()">Print / save as PDF</button></p>`;
+      <p style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost" id="csvBtn" type="button">Download results for Excel (CSV)</button><button class="btn" type="button" id="saveRep">Save report to my account</button><button class="add" type="button" onclick="window.print()">Print</button></p>`;
     if(opt)opt.after();bindExp();bindMC(P,pb,q?t:0);modelsHTML(A,use,w,beta);
     $("#pdetail").querySelectorAll("#blendIn").forEach(c=>c.onchange=()=>{state.blend=c.checked;save();renderPortfolio()});
     $("#csvBtn").onclick=downloadCSV;
+    $("#saveRep").onclick=()=>saveReport("portfolio",{period:state.period+"Y",stocks:use.length,holdings:use.map(h=>h.sym).join(", "),risk:+P.risk.toFixed(4),return:+P.ret.toFixed(4),sharpe:+psh.toFixed(3),beta:Number.isFinite(pb)?+pb.toFixed(3):null,value:q?Math.round(t):null,benchmark:BN()});
   });
 }
 
@@ -863,7 +894,7 @@ function badDaysHTML(A,w,use,rf,val,mS){
 
 
 /* ---------- stocks with a short history: warning, EWMA risk, blend with the sector ---------- */
-function isNew(s){const x=STOCKS[s];if(!x||!x.from||s.startsWith("^"))return 0;const last=LIST.map(y=>y.date).sort().at(-1)||x.date,m=(Date.parse(last)-Date.parse(x.from))/864e5/30.44;return m<12?Math.max(1,Math.round(m)):0}
+function isNew(s){const x=STOCKS[s];if(!x||!x.from||s.startsWith("^"))return 0;const last=lastDate()||x.date,m=(Date.parse(last)-Date.parse(x.from))/864e5/30.44;return m<12?Math.max(1,Math.round(m)):0}
 function ewmaRisk(r,lam=.94){if(r.length<20)return NaN;let v=r.slice(0,20).reduce((a,x)=>a+x*x,0)/20;for(const x of r)v=lam*v+(1-lam)*x*x;return Math.sqrt(v*TD)}
 function sectorPrior(sym,y){
   const ind=STOCKS[sym]&&STOCKS[sym].ind,pool=LIST.filter(x=>x.n5&&x.m&&x.m[String(y)]&&x.sym!==sym),same=pool.filter(x=>ind&&x.ind===ind);
@@ -1250,7 +1281,8 @@ function healthHTML(use,w,P){
 }
 function metric(x,y){const mm=state.edu?x.m30:x.m,m=mm&&mm[String(y)];return m?{ar:m[0],ak:m[1],pr:m[2],cagr:m[3],beta:m[4]==null?NaN:m[4],rr:m[1]>0?(m[0]-state.rf)/m[1]:NaN}:null}
 function viewHome(){
-  const ups=LIST.filter(x=>x.chg>0).length,downs=LIST.filter(x=>x.chg<0).length,last=LIST.map(x=>x.date).sort().at(-1);
+  $("#featBtns").innerHTML=featHTML();
+  const ups=LIST.filter(x=>x.n5&&x.chg>0).length,downs=LIST.filter(x=>x.n5&&x.chg<0).length,last=lastDate();
   if(EDU_CUT)$("#hstrip").innerHTML=`<span><b>${LIST.length}</b>NSE stocks</span><span><b>${esc(fmtD(EDU_CUT))}</b>data up to (education mode)</span>`;else $("#hstrip").innerHTML=`<span><b>${LIST.length}</b>NSE stocks</span><span><b>${esc(fmtD(last))}</b>latest prices</span><span><b><span class="pos">${ups}</span> / <span class="neg">${downs}</span></b>up / down ${LIVE?"today, live":"that day"}</span>`;
   const anyN5=LIST.some(x=>x.n5),y=state.period,pts=LIST.filter(x=>!anyN5||x.n5).map(x=>({x,m:metric(x,y)})).filter(p=>p.m&&Number.isFinite(p.m.ak));
   $("#htitle").textContent=`${sample?"Sample stocks":"Nifty 500"}: risk vs return, last ${y} year${y>1?"s":""}`;
@@ -1276,9 +1308,14 @@ function viewScreen(){
     if(!state.holdings.some(h=>h.sym===s)){state.holdings.push({sym:s,qty:10,buy:0,wt:10});save()}b.disabled=true;b.textContent="Added";toast(s+" added to your portfolio")});
   drawScreen();
 }
+let scrTok=0;
 function drawScreen(){
   const q=$("#sq").value.trim().toLowerCase(),sec=$("#ssec").value,y=state.period;scrSort=$("#ssort").value;
   const anyN5=LIST.some(x=>x.n5),uni=r=>scrUni==="fund"?!!r.x.k:!anyN5||scrUni==="all"||(scrUni==="n5"?r.x.n5:!r.x.n5&&!r.x.k);
+  // only the stocks this search could show are loaded (by first letter); the Nifty 500 is already in memory
+  const cand=LIST.filter(x=>uni({x})&&(!sec||(x.ind||"Not classified")===sec)&&(!q||x.sym.toLowerCase().includes(q)||x.name.toLowerCase().includes(q)));
+  const miss=cand.filter(x=>!x.m).map(x=>x.sym);
+  if(miss.length&&!sample){const t=++scrTok;$("#scount").textContent=`Loading ${miss.length} stock${miss.length>1?"s":""}…`;ensureInfo(miss).then(()=>{if(t===scrTok)drawScreen()});if(!cand.some(x=>x.m))return}
   let rows=LIST.map(x=>({x,m:metric(x,y)})).filter(r=>r.m&&uni(r)&&(!sec||(r.x.ind||"Not classified")===sec)&&(!q||r.x.sym.toLowerCase().includes(q)||r.x.name.toLowerCase().includes(q))&&(!$("#sliq").checked||(r.x.tv??0)>=1));
   const key={lowb:r=>Number.isFinite(r.m.beta)?r.m.beta:99,rr:r=>-r.m.rr,ar:r=>-r.m.ar,lowk:r=>r.m.ak,cagr:r=>-r.m.cagr,chg:r=>-(r.x.chg||0),liq:r=>-(r.x.tv||0),pe:r=>{const F=fund(r.x.sym);return F&&F[0]>0?F[0]:1e9},roe:r=>{const F=fund(r.x.sym);return F&&F[2]!=null?-F[2]:1e9}}[scrSort];
   rows.sort((a,b)=>key(a)-key(b));
@@ -1340,6 +1377,57 @@ document.addEventListener("click",ev=>{
   document.body.appendChild(pop);const r=b.getBoundingClientRect(),w=Math.min(320,innerWidth-24);pop.style.width=w+"px";
   pop.style.left=Math.max(12,Math.min(innerWidth-w-12,r.left+scrollX-w/2))+"px";pop.style.top=(r.bottom+scrollY+8)+"px";
 });
+
+/* ---------- features need sign-in (the admin chooses which), saving to the user's account ---------- */
+const FEATS=[["plan","Plan","Risk profile, goal, asset allocation and your IPS"],["portfolio","Portfolio","Risk, return, health score, optimiser and Monte Carlo"],["perf","Performance","Buys and sells, TWRR, XIRR against the benchmark"],["screen","Screener","Filter and sort every NSE stock and ETF"],["single","One stock","Deep dive on one stock with fundamentals"],["pair","Two stocks","Mix two stocks and see the risk change"],["learn","Formulas","Every formula explained"]];
+let fbFail=false,SITE={gated:["plan","portfolio","perf","screen","single","pair"],banner:""},authReady=false,MY={plans:[],reports:[]};
+const gatedView=v=>(v==="mine"||SITE.gated.includes(v))&&!user&&!fbFail;
+function gateHTML(v){const f=FEATS.find(x=>x[0]===v)||(v==="mine"?["mine","My saved work","Your saved plans, reports and portfolios"]:[v,v,""]);
+  return `<section class="gate panel"><h2>${esc(f[1])}</h2><p>${esc(f[2])}.</p><p><b>Sign in to use this feature.</b> It is free. Your work is saved to your own account, so you can open it on any phone or laptop.</p>
+    ${fbFail?`<p class="note">Sign-in could not load. Check your internet connection and refresh the page.</p>`:authReady?`<button class="btn" type="button" onclick="openAuth()">Sign in or create an account</button>`:`<p class="load">Checking sign-in…</p>`}</section>`}
+const gatedHTMLShown=()=>!!document.querySelector("#main .gate");
+function featHTML(){return FEATS.map(([v,t,d])=>`<a href="${v}/" data-v="${v}" class="fbtn"><b>${esc(t)}${SITE.gated.includes(v)&&!user&&!fbFail?' <span class="lock" title="Sign in needed">🔒</span>':""}</b><span>${esc(d)}</span></a>`).join("")}
+function siteBanner(){const b=document.getElementById("siteBanner");if(!b)return;b.hidden=!SITE.banner;b.textContent=SITE.banner||""}
+function loadSite(){try{FB.F.onSnapshot(FB.F.doc(FB.db,"site","config"),d=>{const c=d.exists()?d.data():{};const g=JSON.stringify(SITE.gated);
+  if(Array.isArray(c.gated))SITE.gated=c.gated;SITE.banner=c.banner||"";siteBanner();if(g!==JSON.stringify(SITE.gated))route();else if(curView()==="home")$("#featBtns")&&($("#featBtns").innerHTML=featHTML())},()=>{})}catch(e){}}
+async function touchProfile(u){try{const F=FB.F,ref=F.doc(FB.db,"users",u.uid),snap=await F.getDoc(ref);
+  await F.setDoc(ref,{email:u.email||"",name:(u.displayName||"").slice(0,80),lastLogin:F.serverTimestamp(),...(snap.exists()?{}:{created:F.serverTimestamp()})},{merge:true})}catch(e){}}
+const subcol=n=>FB.F.collection(FB.db,"users",user.uid,n);
+async function loadMine(){if(!(FB&&user))return;try{const F=FB.F;
+  const [p,r]=await Promise.all(["plans","reports"].map(n=>F.getDocs(F.query(subcol(n),F.orderBy("created","desc"),F.limit(50)))));
+  MY.plans=p.docs.map(d=>({id:d.id,...d.data()}));MY.reports=r.docs.map(d=>({id:d.id,...d.data()}));
+  if(curView()==="plan")drawMyPlans();if(curView()==="mine")viewMine()}catch(e){}}
+const when=c=>c&&c.toDate?c.toDate().toLocaleString("en-IN",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}):"";
+function needSignIn(){if(!FB){toast("Sign-in is not available right now");return true}if(!user){openAuth();return true}return false}
+async function savePlan(){
+  if(needSignIn())return;if(!state.ips){toast("Finish the plan first");return}
+  askName("Name for this plan","Plan "+new Date().toLocaleDateString("en-GB"),async n=>{try{const F=FB.F;
+    await F.addDoc(subcol("plans"),{name:n,ips:JSON.parse(JSON.stringify(state.ips)),created:F.serverTimestamp(),updated:F.serverTimestamp()});
+    toast("Plan saved to your account");loadMine()}catch(e){toast("Not saved: "+authErr(e))}});
+}
+function drawMyPlans(){const el=$("#myPlans");if(!el)return;
+  if(!user){el.innerHTML="";return}
+  el.innerHTML=MY.plans.length?`<h3>My saved plans</h3><div class="scroll"><table><tbody>${MY.plans.map(p=>`<tr><td><b>${esc(p.name||"Plan")}</b><br><span class="note">${esc(when(p.created))}</span></td><td><button class="add" data-open="${esc(p.id)}">Open</button> <button class="rm" data-delp="${esc(p.id)}">Delete</button></td></tr>`).join("")}</tbody></table></div>`:`<p class="note">No saved plans yet.</p>`;
+  el.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>{const p=MY.plans.find(x=>x.id===b.dataset.open);if(p){state.ips=p.ips;save();route();toast("Opened “"+p.name+"”")}});
+  el.querySelectorAll("[data-delp]").forEach(b=>b.onclick=async()=>{try{await FB.F.deleteDoc(FB.F.doc(subcol("plans"),b.dataset.delp));loadMine();toast("Deleted")}catch(e){toast("Not deleted")}});
+}
+async function saveReport(kind,data){
+  if(needSignIn())return;
+  askName("Name for this report",(kind==="perf"?"Performance ":"Portfolio ")+new Date().toLocaleDateString("en-GB"),async n=>{try{const F=FB.F;
+    await F.addDoc(subcol("reports"),{name:n,kind,data,created:F.serverTimestamp()});toast("Report saved to your account");loadMine()}catch(e){toast("Not saved: "+authErr(e))}});
+}
+const REPF={risk:["Risk","p"],return:["Return","p"],twrr:["TWRR","p"],xirr:["XIRR","p"],bench_twrr:["Benchmark","p"],sharpe:["Sharpe","n2"],beta:["Beta","n2"],value:["Value ₹","n0"],invested:["Invested ₹","n0"],stocks:["Stocks","s"],period:["Period","s"],holdings:["Holdings","s"]};
+function repLine(d){return Object.entries(REPF).filter(([k])=>d[k]!=null&&d[k]!=="").map(([k,[l,f]])=>{const v=d[k];return `<span class="kv">${l} <b>${esc(f==="p"?pct(v,1):f==="n2"?num(v,2):f==="n0"?num(v,0):String(v))}</b></span>`}).join(" · ")}
+function viewMine(){
+  const el=$("#mineBody");if(!el)return;
+  if(!user){el.innerHTML=gateHTML("mine");return}
+  const r=x=>`<tr><td><b>${esc(x.name||"")}</b><br><span class="note">${esc(when(x.created))}</span></td><td class="note">${esc(x.kind==="perf"?"Performance":"Portfolio")}</td><td>${x.data?repLine(x.data):""}</td><td><button class="rm" data-delr="${esc(x.id)}">Delete</button></td></tr>`;
+  el.innerHTML=`<h3>Saved plans</h3>${MY.plans.length?`<div class="scroll"><table><tbody>${MY.plans.map(p=>`<tr><td><b>${esc(p.name)}</b><br><span class="note">${esc(when(p.created))}</span></td><td><a class="add" href="plan/" data-v="plan" data-pid="${esc(p.id)}">Open in Plan</a></td></tr>`).join("")}</tbody></table></div>`:`<p class="note">None yet.</p>`}
+    <h3 style="margin-top:18px">Saved reports</h3>${MY.reports.length?`<div class="scroll"><table><tbody>${MY.reports.map(r).join("")}</tbody></table></div>`:`<p class="note">None yet. Use “Save report to my account” on the Portfolio or Performance page.</p>`}
+    <h3 style="margin-top:18px">Saved portfolios</h3><p class="note">${cloud.length} portfolio${cloud.length===1?"":"s"}, open them on the Portfolio page.</p>`;
+  el.querySelectorAll("[data-pid]").forEach(a=>a.addEventListener("click",()=>{const p=MY.plans.find(x=>x.id===a.dataset.pid);if(p){state.ips=p.ips;save()}}));
+  el.querySelectorAll("[data-delr]").forEach(b=>b.onclick=async()=>{try{await FB.F.deleteDoc(FB.F.doc(subcol("reports"),b.dataset.delr));loadMine()}catch(e){toast("Not deleted")}});
+}
 /* ---------- plan: risk profile, goal, asset allocation, IPS ---------- */
 const RQ=[
  ["Age",["Over 60","50 to 60","40 to 50","30 to 40","Under 30"]],
@@ -1367,6 +1455,7 @@ function viewPlan(){
   $("#rq").querySelectorAll("input").forEach(inp=>inp.onchange=()=>{const i=+inp.name.slice(2);I.ans[i]=+inp.value;const sc=score();if(sc.done&&!I.manual)I.alloc={...profOf(sc.sum)[3]};save();drawPlan()});
   const bind=(id,k)=>{$(id).value=I[k];$(id).onchange=()=>{const v=parseFloat(String($(id).value).replace(/,/g,""));if(Number.isFinite(v)&&v>=0){I[k]=v;save();drawPlan()}}};
   bind("#gAmt","goal");bind("#gYrs","years");bind("#gNow","now");bind("#gSip","sip");
+  $("#savePlan").onclick=savePlan;drawMyPlans();
   drawPlan();
 }
 function score(){const a=state.ips.ans,n=RQ.filter((_,i)=>a[i]).length;return {done:n===RQ.length,n,sum:a.reduce((s,x)=>s+(x||0),0)}}
@@ -1495,7 +1584,7 @@ function twoLine(W,H,dates,a,b){
 }
 const cleanTx=t=>(Array.isArray(t)?t:[]).slice(0,1000).map(x=>({d:String(x&&x.d||"").slice(0,10),sym:cleanSym(x&&x.sym),type:x&&x.type==="sell"?"sell":"buy",qty:Math.max(0,+x.qty||0),price:Math.max(0,+x.price||0)})).filter(x=>/^\d{4}-\d\d-\d\d$/.test(x.d)&&x.sym&&x.qty>0&&x.price>0);
 function viewPerf(){
-  const lastD=EDU_CUT||LIST.map(x=>x.date).sort().at(-1)||new Date().toISOString().slice(0,10);
+  const lastD=EDU_CUT||lastDate()||new Date().toISOString().slice(0,10);
   $("#txD").value=$("#txD").value||lastD;$("#txD").max=lastD;
   const fill=()=>{const s=state.txSym,d=$("#txD").value;if(!s||!d||!STOCKS[s])return;ensure(s).then(()=>{const c=closeOn(s,d);if(Number.isFinite(c)){$("#txP").value=c.toFixed(2);$("#txHint").textContent=`close on or before ${fmtD(d)}: ₹${num(c)}; change it to your real price`}else $("#txHint").textContent="no price before this date"}).catch(()=>{})};
   pickLabel($("#txS"),state.txSym);$("#benchBoxP").innerHTML=hasIdx()?benchSel():"";
@@ -1547,14 +1636,15 @@ function renderPerf(){
       ${R.hs.map(h=>`<tr><td><b>${esc(h.s)}</b></td><td class="n">${num(h.q,h.q%1>1e-6?2:0)}</td><td class="n hide-s">${num(h.avg)}</td><td class="n hide-s">${num(h.px)}</td><td class="n">${num(h.val,0)}</td><td class="n ${cls(h.unr)}">${rs(h.unr)}</td><td class="n ${cls(h.real)}">${h.real?rs(h.real):"–"}</td><td class="n hide-s">${h.div?"₹"+num(h.div,0):"–"}</td></tr>`).join("")}
       <tr><td><b>Total</b></td><td></td><td class="hide-s"></td><td class="hide-s"></td><td class="n"><b>${num(R.V,0)}</b></td><td class="n ${cls(R.unr)}"><b>${rs(R.unr)}</b></td><td class="n ${cls(R.real)}"><b>${rs(R.real)}</b></td><td class="n hide-s"><b>₹${num(R.divTot,0)}</b></td></tr>
     </tbody></table></div>
-    <p style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost" id="toPort" type="button">Analyse these holdings on the Portfolio page</button><button class="btn ghost" type="button" onclick="window.print()">Print performance report</button></p>
+    <p style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost" id="toPort" type="button">Analyse these holdings on the Portfolio page</button><button class="btn" type="button" id="savePerf">Save report to my account</button><button class="add" type="button" onclick="window.print()">Print</button></p>
     ${R.notes.length?`<p class="note">${R.notes.map(esc).join("<br>")}</p>`:""}
     <p class="note"><b>TWRR</b> measures the stock picking and is what SEBI asks portfolio managers to report. <b>XIRR</b> is the yearly return on your own money and timing. Realised gains use FIFO. Dividends are counted on their ex-date for shares held the day before. ${STOCKS[IDX]&&STOCKS[IDX].file==="_NIFTY50TRI"?"Benchmark: Nifty 50 Total Return Index (dividends included).":"Benchmark: "+BN()+" (price index, dividends not included), so the comparison slightly favours you."} No brokerage, taxes or fees are included. For learning, not investment advice.</p>`;
     draw($("#perffig"),(W,H)=>twoLine(W,H,R.series.map(x=>x.d),R.series.map(x=>x.cum*100),R.series.map(x=>x.n*100)));
+    $("#savePerf").onclick=()=>saveReport("perf",{from:R.series[0].d,to:R.end,value:Math.round(R.V),invested:Math.round(R.net),twrr:+R.twA.toFixed(4),xirr:Number.isFinite(R.xirr)?+R.xirr.toFixed(4):null,benchmark:BN(),bench_twrr:Number.isFinite(R.nfA)?+R.nfA.toFixed(4):null});
     $("#toPort").onclick=()=>{state.holdings=R.hs.filter(h=>h.q>1e-6).map(h=>({sym:h.s,qty:Math.round(h.q*100)/100,buy:Math.round(h.avg*100)/100,wt:10}));state.mode="qty";save();go("portfolio")};
   });
 }
-const views={home:["t-home",viewHome],plan:["t-plan",viewPlan],perf:["t-perf",viewPerf],screen:["t-screen",viewScreen],portfolio:["t-portfolio",viewPortfolio],pair:["t-pair",viewPair],single:["t-single",viewSingle],learn:["t-learn",viewLearn]};
+const views={mine:["t-mine",viewMine],home:["t-home",viewHome],plan:["t-plan",viewPlan],perf:["t-perf",viewPerf],screen:["t-screen",viewScreen],portfolio:["t-portfolio",viewPortfolio],pair:["t-pair",viewPair],single:["t-single",viewSingle],learn:["t-learn",viewLearn]};
 /* ---------- accounts and saved portfolios (Firebase) ---------- */
 const FBCFG={apiKey:"AIzaSyC3ZYgWqcT0-tG7-lSlKzcM-9JEcnhB6OM",authDomain:"risklab---karthi.firebaseapp.com",projectId:"risklab---karthi",storageBucket:"risklab---karthi.firebasestorage.app",messagingSenderId:"78064528496",appId:"1:78064528496:web:8fef81fcb71999471b18b5"};
 let FB=null,user=null,cloud=[],curId=null,cloudT=null,cloudMsg="";
@@ -1564,14 +1654,17 @@ async function fbInit(){
     const B="https://www.gstatic.com/firebasejs/10.12.2/";
     const [app,A,F]=await Promise.all([import(B+"firebase-app.js"),import(B+"firebase-auth.js"),import(B+"firebase-firestore.js")]);
     const a=app.initializeApp(FBCFG);FB={A,F,auth:A.getAuth(a),db:F.getFirestore(a)};
-    A.onAuthStateChanged(FB.auth,u=>{user=u;acct();if(u){$("#authDlg").open&&$("#authDlg").close();loadCloud()}else{cloud=[];curId=null;if(onPortfolio())drawCloud()}});
+    loadSite();
+    A.onAuthStateChanged(FB.auth,u=>{const was=!!user;user=u;authReady=true;acct();
+      if(u){$("#authDlg").open&&$("#authDlg").close();touchProfile(u);loadCloud();loadMine()}else{cloud=[];curId=null;MY={plans:[],reports:[]};if(onPortfolio())drawCloud()}
+      if(was!==!!u||!was)route()});
     acct();
-  }catch(e){FB=null;$("#acct").innerHTML="";console.warn("Sign-in unavailable",e)}
+  }catch(e){FB=null;fbFail=true;$("#acct").innerHTML="";console.warn("Sign-in unavailable",e);if(gatedHTMLShown())route();else if($("#featBtns"))$("#featBtns").innerHTML=featHTML()}
 }
 function acct(){
   const el=$("#acct");if(!el)return;
   if(!FB){el.innerHTML="";return}
-  el.innerHTML=user?`<span class="who">${esc((user.displayName||user.email||"Signed in").slice(0,24))}</span><button class="pill" id="outBtn" type="button">Sign out</button><button class="pill" id="delAcct" type="button" title="Delete your account and all saved portfolios">Delete account</button>`
+  el.innerHTML=user?`<a class="pill" href="mine/" data-v="mine" style="display:inline-flex;align-items:center;text-decoration:none">My saved</a><span class="who">${esc((user.displayName||user.email||"Signed in").slice(0,24))}</span><button class="pill" id="outBtn" type="button">Sign out</button><button class="pill" id="delAcct" type="button" title="Delete your account and all saved portfolios">Delete account</button>`
     :`<button class="pill" id="inBtn" type="button">Sign in</button>`;
   if(user){$("#outBtn").onclick=()=>FB.A.signOut(FB.auth).then(()=>toast("Signed out"));$("#delAcct").onclick=deleteAccount}
   else $("#inBtn").onclick=openAuth;
@@ -1583,10 +1676,11 @@ async function deleteAccount(){
   if(Date.now()-delAcctArm>4000){delAcctArm=Date.now();b.textContent="Tap again to delete everything";return}
   b.disabled=true;b.textContent="Deleting…";
   try{
-    const F=FB.F,snap=await F.getDocs(pcol());
-    for(const d of snap.docs)await F.deleteDoc(d.ref);
+    const F=FB.F;
+    for(const n of ["portfolios","plans","reports"]){const snap=await F.getDocs(subcol(n));for(const d of snap.docs)await F.deleteDoc(d.ref)}
+    await F.deleteDoc(F.doc(FB.db,"users",user.uid)).catch(()=>{});
     await FB.A.deleteUser(FB.auth.currentUser);
-    cloud=[];curId=null;toast("Your account and saved portfolios are deleted");
+    cloud=[];curId=null;MY={plans:[],reports:[]};toast("Your account and everything you saved are deleted");
   }catch(e){
     b.disabled=false;b.textContent="Delete account";
     alertBox(e&&e.code==="auth/requires-recent-login"?"Your portfolios are deleted. For safety, please sign out, sign in again and tap Delete account once more to remove the account itself.":"Could not delete: "+authErr(e));
@@ -1669,9 +1763,10 @@ document.addEventListener("click",ev=>{
 window.addEventListener("popstate",()=>route());
 function route(){
   const tab=curView();
-  const titles={home:"Portfolio Risk Lab",plan:"Plan",portfolio:"Portfolio",perf:"Performance",pair:"Two stocks",single:"One stock",screen:"Screener",learn:"Formulas"};
+  const titles={mine:"My saved work",home:"Portfolio Risk Lab",plan:"Plan",portfolio:"Portfolio",perf:"Performance",pair:"Two stocks",single:"One stock",screen:"Screener",learn:"Formulas"};
   document.title=tab==="home"?"Portfolio Risk Lab":titles[tab]+" · Portfolio Risk Lab";
   document.querySelectorAll("#tabs a").forEach(a=>a.toggleAttribute("aria-current",a.dataset.v===tab));
+  if(gatedView(tab)){$("#main").innerHTML=gateHTML(tab==="mine"?"mine":tab);token++;return}
   const [tid,fn]=views[tab];$("#main").replaceChildren($("#"+tid).content.cloneNode(true));token++;fn();
   if(tab==="portfolio"||tab==="perf")drawCloud();
 }
