@@ -1119,8 +1119,8 @@ function renderSingle(){
       <tr><td>1-day VaR 95% / CVaR 95%</td><td class="n neg">${pct(T.var95,2)} / ${pct(T.cvar,2)}</td></tr>
       <tr><td>Sortino ratio</td><td class="n">${Number.isFinite(T.sortino)?fx(T.sortino):"–"}</td></tr>
       <tr><td>Traded a day (last 3 months)</td><td class="n">${STOCKS[s]&&STOCKS[s].tv!=null?`₹${num(STOCKS[s].tv)} crore`:"–"}</td></tr>
-      ${(F=>F?`<tr><td colspan="2"><b>Fundamentals</b> <span class="note">(Yahoo Finance, ${esc(fmtD(F[7]))})</span></td></tr>
-      <tr><td>P/E ratio ${tip("pe")}</td><td class="n">${F[0]!=null?fx(F[0],1):"–"}</td></tr>
+      ${(F=>F?`<tr><td colspan="2"><b>Fundamentals</b> <span class="note">(Yahoo Finance or NSE, ${esc(fmtD(F[7]))})</span></td></tr>
+      <tr><td>P/E ratio ${tip("pe")}</td><td class="n">${F[0]!=null?fx(F[0],1):"–"}${F[8]!=null?` <span class="note">sector ${fx(F[8],1)}</span>`:""}</td></tr>
       <tr><td>P/B ratio ${tip("pb")}</td><td class="n">${F[1]!=null?fx(F[1],2):"–"}</td></tr>
       <tr><td>ROE ${tip("roe")}</td><td class="n">${F[2]!=null?pct(F[2],1):"–"}</td></tr>
       <tr><td>Debt to equity ${tip("de")}</td><td class="n">${F[3]!=null?fx(F[3]/100,2):"–"}</td></tr>
