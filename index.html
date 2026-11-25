@@ -100,6 +100,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #plist span{color:var(--mute);font-size:13px}
 #plist .px{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 #plist button[disabled]{opacity:.45}
+.txrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end}.txrow label{font-size:14px;display:grid;gap:2px}.txrow .wide{grid-column:span 2}@media(max-width:600px){.txrow .wide{grid-column:1/-1}}#txList table{max-width:760px}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22em),1fr));gap:20px;align-items:start}
 .hero{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:28px;align-items:center}
 .hero h2{font-size:clamp(32px,4.4vw,50px);margin-bottom:14px}
@@ -304,33 +305,30 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
 </template>
 
 <template id="t-perf">
-  <div class="grid">
-    <section class="panel soft">
-      <div id="cloud"></div>
-      <h2>Buy and sell list</h2>
-      <p class="note" style="margin-top:0">Add each buy and sell with its date. The site then measures your real performance the way SEBI asks portfolio managers to: TWRR, plus your XIRR, against Nifty 50.</p>
-      <div style="display:grid;gap:8px">
-        <label style="font-size:14px;display:grid;gap:2px">Date<input id="txD" type="date"></label>
-        <label style="font-size:14px;display:grid;gap:2px">Stock<button class="pickbtn" id="txS" type="button"></button></label>
-        <div style="display:flex;gap:8px">
-          <label style="font-size:14px;display:grid;gap:2px;flex:1">Type<select id="txT"><option value="buy">Buy</option><option value="sell">Sell</option></select></label>
-          <label style="font-size:14px;display:grid;gap:2px;flex:1">Quantity<input id="txQ" inputmode="decimal" value="10"></label>
-        </div>
-        <label style="font-size:14px;display:grid;gap:2px">Price ₹ per share <span class="note" style="margin:0" id="txHint">filled with that day's close; change it to your real price</span><input id="txP" inputmode="decimal"></label>
-        <button class="btn" id="txAdd" type="button">Add to list</button>
-        <p class="err" id="txErr" role="alert" style="margin:0"></p>
-      </div>
-      <div id="txList" style="margin-top:14px"></div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
-        <button class="add" id="txImp" type="button">Import CSV</button><input type="file" id="txFile" accept=".csv,text/csv" hidden>
-        <button class="add" id="txExp" type="button">Export CSV</button>
-        <button class="add" id="txEx" type="button">Load an example</button>
-        <button class="add" id="txClr" type="button" style="color:var(--red)">Clear all</button>
-      </div>
-      <p class="note">CSV columns: Date, Symbol, Type (Buy/Sell), Quantity, Price. Dates like 2025-01-31 or 31-01-2025.</p>
-    </section>
-    <section class="result"><div id="perfres"></div></section>
-  </div>
+  <section class="panel soft">
+    <div id="cloud"></div>
+    <h2>Buy and sell list</h2>
+    <p class="note" style="margin-top:0">Add each buy and sell with its date. The site then measures your real performance the way SEBI asks portfolio managers to: TWRR, plus your XIRR, against Nifty 50.</p>
+    <div class="txrow">
+      <label>Date<input id="txD" type="date"></label>
+      <label class="wide">Stock<button class="pickbtn" id="txS" type="button"></button></label>
+      <label>Type<select id="txT"><option value="buy">Buy</option><option value="sell">Sell</option></select></label>
+      <label>Quantity<input id="txQ" inputmode="decimal" value="10"></label>
+      <label>Price ₹ per share<input id="txP" inputmode="decimal"></label>
+      <button class="btn" id="txAdd" type="button">Add to list</button>
+    </div>
+    <p class="note" id="txHint" style="margin:6px 0 0">Price is filled with that day's close; change it to your real price.</p>
+    <p class="err" id="txErr" role="alert" style="margin:4px 0 0"></p>
+    <div id="txList" style="margin-top:12px"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center">
+      <button class="add" id="txImp" type="button">Import CSV</button><input type="file" id="txFile" accept=".csv,text/csv" hidden>
+      <button class="add" id="txExp" type="button">Export CSV</button>
+      <button class="add" id="txEx" type="button">Load an example</button>
+      <button class="add" id="txClr" type="button" style="color:var(--red)">Clear all</button>
+      <span class="note" style="margin:0">CSV columns: Date, Symbol, Type (Buy/Sell), Quantity, Price. Dates like 2025-01-31 or 31-01-2025.</span>
+    </div>
+  </section>
+  <section class="result" style="margin-top:22px"><h2>Your performance</h2><div id="perfres"></div></section>
 </template>
 
 <template id="t-learn">
