@@ -1,0 +1,7 @@
+# Customer site on Vercel. The admin site is a separate Vercel project (Root Directory = admin).
+admin
+.github
+*.py
+__pycache__
+firestore.rules
+README.md

@@ -50,7 +50,7 @@ textarea{min-height:70px}
 </head>
 <body>
 <header class="top">
-  <div><h1>Admin</h1><div class="note" style="color:#cfe5e3">Portfolio Risk Lab · <a href="../" target="_blank" rel="noopener">open customer site ↗</a></div></div>
+  <div><h1>Admin</h1><div class="note" style="color:#cfe5e3">Portfolio Risk Lab · <a id="custLink" href="https://karthiask11.github.io/risklab/" target="_blank" rel="noopener">open customer site ↗</a></div></div>
   <div class="row" id="acct"></div>
 </header>
 <div id="app"><p class="login note">Loading…</p></div>
@@ -58,6 +58,9 @@ textarea{min-height:70px}
 <script type="module">
 const FBCFG={apiKey:"AIzaSyC3ZYgWqcT0-tG7-lSlKzcM-9JEcnhB6OM",authDomain:"risklab---karthi.firebaseapp.com",projectId:"risklab---karthi",storageBucket:"risklab---karthi.firebasestorage.app",messagingSenderId:"78064528496",appId:"1:78064528496:web:8fef81fcb71999471b18b5"};
 const REPO="karthiask11/risklab",OWNER_EMAIL="stockanalysistamil@gmail.com";
+// Admin is published as its own site, so it reads the data straight from GitHub (same files the customer site uses).
+const CUSTOMER_URL="https://karthiask11.github.io/risklab/";   // change to your customer Vercel address
+const DATA=`https://raw.githubusercontent.com/${REPO}/main/data/`;
 const FEATS=[["plan","Plan"],["portfolio","Portfolio"],["perf","Performance"],["screen","Screener"],["single","One stock"],["pair","Two stocks"],["learn","Formulas"]];
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -69,6 +72,7 @@ const B="https://www.gstatic.com/firebasejs/10.12.2/";
 let app,A,F;
 try{[app,A,F]=await Promise.all([import(B+"firebase-app.js"),import(B+"firebase-auth.js"),import(B+"firebase-firestore.js")])}
 catch(e){$("#app").innerHTML=`<div class="login"><h2>Could not load sign-in</h2><p class="note">Check your internet connection and refresh.</p></div>`;throw e}
+$("#custLink").href=CUSTOMER_URL;
 const fa=app.initializeApp(FBCFG),auth=A.getAuth(fa),db=F.getFirestore(fa);
 let user=null,tab="data",unsub=[],USERS=[],COUNTS={},SITE={gated:[],banner:""},ADMINS=[],timer=null;
 
@@ -127,7 +131,7 @@ const j=u=>fetch(u,{cache:"no-cache"}).then(r=>r.ok?r.json():null).catch(()=>nul
 function health(d,okH,warnH){if(!d)return "bad";const h=(Date.now()-d.getTime())/36e5;return h<=okH?"ok":h<=warnH?"warn":"bad"}
 async function drawData(){
   const el=$("#body");if(!el.dataset.ready)el.innerHTML=`<p class="note">Reading the data files…</p>`;
-  const [meta,fund,live,runs]=await Promise.all([j("../data/meta.json"),j("../data/fund.json"),j(`https://raw.githubusercontent.com/${REPO}/live/live.json?t=${Date.now()}`),j(`https://api.github.com/repos/${REPO}/actions/runs?per_page=12`)]);
+  const [meta,fund,live,runs]=await Promise.all([j(DATA+"meta.json?t="+Date.now()),j(DATA+"fund.json?t="+Date.now()),j(`https://raw.githubusercontent.com/${REPO}/live/live.json?t=${Date.now()}`),j(`https://api.github.com/repos/${REPO}/actions/runs?per_page=12`)]);
   if(tab!=="data")return;el.dataset.ready=1;
   const mu=meta&&new Date(meta.updated),fu=fund&&new Date(fund.updated),lu=live&&live.t?new Date(live.t):null;
   const nU=USERS.length,nP=Object.values(COUNTS).filter(x=>x&&x.portfolios!=null).reduce((a,x)=>a+x.portfolios,0);
