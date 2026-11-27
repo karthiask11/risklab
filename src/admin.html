@@ -79,16 +79,33 @@ const fa=app.initializeApp(FBCFG),auth=A.getAuth(fa),db=F.getFirestore(fa);
 let ACT=[],STK={add:[],remove:[],edit:{}},LISTR=null,CHG=null,stkQ="",actF="";
 let user=null,tab="data",unsub=[],USERS=[],COUNTS={},SITE={gated:[],banner:"",v2:{}},CONTENT={},BLOCKED={},ADMINS=[],timer=null,ghTimer=null,openUid=null;
 
+/* ---------- admin login with a User ID (each ID points to the admin's account email, kept in adminLogin/{id}) ---------- */
+const idOk=v=>/^[a-z0-9._-]{3,30}$/.test(v);
+const maskEmail=e=>{const [u,d]=String(e).split("@");return d?u.slice(0,2)+"*".repeat(Math.max(2,u.length-2))+"@"+d:"your email"};
+async function emailForId(id){const d=await F.getDoc(F.doc(db,"adminLogin",id));return d.exists()?d.data().email:null}
 function loginView(msg){
   $("#acct").innerHTML="";
   $("#app").innerHTML=`<div class="login"><h2>Admin sign in</h2>
-    <button class="btn" id="g">Sign in with Google</button>
-    <div class="note">or with email</div>
-    <input type="email" id="em" placeholder="Email" autocomplete="username"><input type="password" id="pw" placeholder="Password" autocomplete="current-password">
-    <button class="btn ghost" id="e">Sign in</button><div class="err" id="err">${esc(msg||"")}</div>
+    <input type="text" id="uid" placeholder="User ID" autocomplete="username" autocapitalize="off" spellcheck="false">
+    <input type="password" id="pw" placeholder="Password" autocomplete="current-password">
+    <button class="btn" id="e">Sign in</button>
+    <button class="add" id="fg" type="button" style="border:0;background:none;color:var(--teal);font:inherit;cursor:pointer">Forgot password?</button>
+    <div class="err" id="err">${esc(msg||"")}</div>
+    <details style="margin-top:6px"><summary class="note">Other sign-in options</summary><button class="btn ghost" id="g" style="margin-top:8px;width:100%">Sign in with Google</button>
+      <p class="note">First time? Sign in with Google, then set your User ID and password in the Admins tab.</p></details>
     <p class="note">Only admin accounts can open this page. Customers sign in on the main site.</p></div>`;
+  const go=async()=>{const id=$("#uid").value.trim().toLowerCase(),pw=$("#pw").value;$("#err").textContent="";
+    if(!idOk(id)||!pw){$("#err").textContent="Enter your User ID and password.";return}
+    $("#e").disabled=true;
+    try{const em=await emailForId(id);if(!em)throw {code:"noid"};await A.signInWithEmailAndPassword(auth,em,pw)}
+    catch(e){$("#err").textContent=e.code==="auth/too-many-requests"?"Too many tries. Wait a few minutes or use Forgot password.":"Wrong User ID or password.";$("#e").disabled=false}};
+  $("#e").onclick=go;$("#pw").onkeydown=e=>{if(e.key==="Enter")go()};
+  $("#fg").onclick=async()=>{const id=$("#uid").value.trim().toLowerCase();
+    if(!idOk(id)){$("#err").textContent="Type your User ID first, then tap Forgot password.";return}
+    try{const em=await emailForId(id);if(em){await A.sendPasswordResetEmail(auth,em)}
+      $("#err").innerHTML=`<span class="ok">${em?`A reset link was sent to ${esc(maskEmail(em))}. Open it, choose a new password, then sign in here with your User ID.`:"If this User ID exists, a reset link has been sent to its email."}</span>`}
+    catch(e){$("#err").textContent="Could not send the reset email. Try again later."}};
   $("#g").onclick=async()=>{try{await A.signInWithPopup(auth,new A.GoogleAuthProvider())}catch(e){$("#err").textContent=e.code==="auth/unauthorized-domain"?"Add this website to Firebase → Authentication → Authorized domains.":e.message}};
-  $("#e").onclick=async()=>{try{await A.signInWithEmailAndPassword(auth,$("#em").value.trim(),$("#pw").value)}catch(e){$("#err").textContent="Wrong email or password."}};
 }
 async function isAdmin(u){
   if(u.email===OWNER_EMAIL&&u.emailVerified)return true;
@@ -226,14 +243,34 @@ function drawSettings(){
 }
 
 /* ---------- admins ---------- */
+async function myLoginCard(){
+  const box=$("#myLogin");if(!box)return;
+  const q=await F.getDocs(F.query(F.collection(db,"adminLogin"),F.where("uid","==",user.uid))).catch(()=>null),cur=q&&q.docs[0]?q.docs[0].id:"";
+  const hasPw=user.providerData.some(p=>p.providerId==="password");
+  box.innerHTML=`<h3>My sign-in: User ID and password</h3><p class="note">${cur?`Your User ID is <b>${esc(cur)}</b>.`:"You have no User ID yet."} ${hasPw?"A password is set.":"No password yet (you signed in with Google)."} Forgot password sends a reset link to ${esc(maskEmail(user.email))}.</p>
+    <div class="row"><input type="text" id="myId" placeholder="User ID (3–30: a–z, 0–9, . _ -)" value="${esc(cur)}" style="max-width:260px" autocapitalize="off">
+    <input type="password" id="myPw" placeholder="${hasPw?"New password (leave empty to keep)":"Password (8+ characters)"}" style="max-width:240px" autocomplete="new-password">
+    <input type="password" id="myPw2" placeholder="Repeat password" style="max-width:200px" autocomplete="new-password"><button class="btn" id="mySave">Save</button></div><div class="err" id="myErr"></div>`;
+  $("#mySave").onclick=async()=>{const id=$("#myId").value.trim().toLowerCase(),pw=$("#myPw").value,pw2=$("#myPw2").value,er=$("#myErr");er.textContent="";
+    if(!idOk(id)){er.textContent="User ID: 3 to 30 characters, small letters, numbers, dot, dash or underscore.";return}
+    if(!hasPw&&!pw){er.textContent="Choose a password.";return}
+    if(pw&&(pw.length<8||pw!==pw2)){er.textContent=pw.length<8?"Password needs at least 8 characters.":"The two passwords are different.";return}
+    try{
+      if(id!==cur){const ex=await F.getDoc(F.doc(db,"adminLogin",id));if(ex.exists()&&ex.data().uid!==user.uid){er.textContent="That User ID is taken. Choose another.";return}
+        await F.setDoc(F.doc(db,"adminLogin",id),{email:user.email,uid:user.uid,updated:F.serverTimestamp()});if(cur)await F.deleteDoc(F.doc(db,"adminLogin",cur))}
+      if(pw){if(hasPw)await A.updatePassword(auth.currentUser,pw);else await A.linkWithCredential(auth.currentUser,A.EmailAuthProvider.credential(user.email,pw))}
+      toast("Saved. Next time sign in with your User ID and password.");myLoginCard()}
+    catch(e){er.textContent=e.code==="auth/requires-recent-login"?"For safety, sign out, sign in again, then save the password within 5 minutes.":e.code==="auth/weak-password"?"Choose a stronger password.":"Not saved: "+(e.code||e.message)}};
+}
 function drawAdmins(){
   const el=$("#body");
-  el.innerHTML=`<h2>Admins</h2><p class="note">${esc(OWNER_EMAIL)} is always an admin. Add more from the Users tab (they must sign in once first).</p>
+  el.innerHTML=`<div class="card" id="myLogin" style="margin-bottom:18px"><p class="load">Loading…</p></div><h2>Admins</h2><p class="note">${esc(OWNER_EMAIL)} is always an admin. Add more from the Users tab (they must sign in once first). Each admin then sets their own User ID and password at the top of this tab.</p>
   <div class="scroll"><table><thead><tr><th>Email</th><th>Added</th><th>By</th><th></th></tr></thead><tbody>
   <tr><td>${esc(OWNER_EMAIL)} <span class="pill">owner</span></td><td>—</td><td>—</td><td></td></tr>
   ${ADMINS.map(a=>`<tr><td>${esc(a.email)}</td><td>${dt(tsd(a.added))}</td><td>${esc(a.by)}</td><td>${a.id===user.uid?"":`<button class="btn red sm" data-rm="${esc(a.id)}">Remove</button>`}</td></tr>`).join("")}
   </tbody></table></div>`;
-  el.querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{if(!confirmTwice(b,"Tap again to remove"))return;try{await F.deleteDoc(F.doc(db,"admins",b.dataset.rm));toast("Removed")}catch(e){toast("Not removed: "+e.code)}});
+  myLoginCard();
+  el.querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{if(!confirmTwice(b,"Tap again to remove"))return;try{await F.deleteDoc(F.doc(db,"admins",b.dataset.rm));const lg=await F.getDocs(F.query(F.collection(db,"adminLogin"),F.where("uid","==",b.dataset.rm))).catch(()=>null);if(lg)for(const d of lg.docs)await F.deleteDoc(d.ref);toast("Removed")}catch(e){toast("Not removed: "+e.code)}});
 }
 
 /* ---------- run the data updates from here (GitHub Actions, token kept only in this browser) ---------- */

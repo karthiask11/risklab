@@ -33,6 +33,19 @@ service cloud.firestore {
         && request.resource.data.at == request.time;
       allow read, delete: if isAdmin();
     }
+    // Admin User IDs: anyone may look up one exact ID (to sign in); only admins list or change them; each admin sets their own.
+    match /adminLogin/{id} {
+      allow get: if true;
+      allow list, delete: if isAdmin();
+      allow create: if isAdmin() && id.matches('^[a-z0-9._-]{3,30}$')
+        && request.resource.data.keys().hasOnly(['email', 'uid', 'updated'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email;
+      allow update: if isAdmin() && resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['email', 'uid', 'updated'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email;
+    }
     // Admin list.
     match /admins/{uid} {
       allow read: if isAdmin() || owner(uid);
