@@ -22,6 +22,17 @@ service cloud.firestore {
       allow read: if isAdmin() || owner(uid);
       allow write: if isAdmin();
     }
+    // Activity from the customer site: a signed-in user can only add their own events; only admins read or delete.
+    match /activity/{id} {
+      allow create: if signedIn() && !blockedUser()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'type', 'detail', 'at'])
+        && request.resource.data.type in ['signin', 'view', 'stocks', 'save_plan', 'save_report']
+        && request.resource.data.email is string && request.resource.data.email.size() <= 200
+        && request.resource.data.detail is string && request.resource.data.detail.size() <= 300
+        && request.resource.data.at == request.time;
+      allow read, delete: if isAdmin();
+    }
     // Admin list.
     match /admins/{uid} {
       allow read: if isAdmin() || owner(uid);

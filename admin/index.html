@@ -76,6 +76,7 @@ try{[app,A,F]=await Promise.all([import(B+"firebase-app.js"),import(B+"firebase-
 catch(e){$("#app").innerHTML=`<div class="login"><h2>Could not load sign-in</h2><p class="note">Check your internet connection and refresh.</p></div>`;throw e}
 $("#custLink").href=CUSTOMER_URL;
 const fa=app.initializeApp(FBCFG),auth=A.getAuth(fa),db=F.getFirestore(fa);
+let ACT=[],STK={add:[],remove:[],edit:{}},LISTR=null,CHG=null,stkQ="",actF="";
 let user=null,tab="data",unsub=[],USERS=[],COUNTS={},SITE={gated:[],banner:"",v2:{}},CONTENT={},BLOCKED={},ADMINS=[],timer=null,ghTimer=null,openUid=null;
 
 function loginView(msg){
@@ -103,18 +104,20 @@ A.onAuthStateChanged(auth,async u=>{
   timer=setInterval(()=>{if(tab==="data")drawData();counts()},5*60*1000);
 });
 function shell(){
-  const T=[["data","Data & updates"],["users","Users"],["saved","Saved work"],["content","Site content"],["settings","Features & access"],["admins","Admins"]];
+  const T=[["data","Data & updates"],["stocks","Stocks & companies"],["activity","Activity"],["users","Users"],["saved","Saved work"],["content","Site content"],["settings","Features & access"],["admins","Admins"]];
   $("#app").innerHTML=`<nav class="tabs" role="tablist">${T.map(([k,l])=>`<button role="tab" data-t="${k}" aria-selected="${k===tab}">${l}</button>`).join("")}</nav><main id="body"></main>`;
   document.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{tab=b.dataset.t;document.querySelectorAll("[data-t]").forEach(x=>x.setAttribute("aria-selected",x===b));draw()});
   draw();
 }
-function draw(){if(tab!=="data")clearTimeout(ghTimer);({data:drawData,users:openUid?drawUser:drawUsers,saved:drawSaved,content:drawContent,settings:drawSettings,admins:drawAdmins})[tab]()}
+function draw(){if(tab!=="data")clearTimeout(ghTimer);({data:drawData,stocks:drawStocks,activity:drawActivity,users:openUid?drawUser:drawUsers,saved:drawSaved,content:drawContent,settings:drawSettings,admins:drawAdmins})[tab]()}
 
 /* live Firestore listeners: everything updates by itself */
 function watch(){
   unsub.push(F.onSnapshot(F.collection(db,"users"),s=>{USERS=s.docs.map(d=>({id:d.id,...d.data()}));if(tab==="users")drawUsers()},e=>console.warn(e)));
   unsub.push(F.onSnapshot(F.doc(db,"site","config"),d=>{const c=d.exists()?d.data():{};SITE={gated:Array.isArray(c.gated)?c.gated:["plan","portfolio","perf","screen","single","pair"],banner:c.banner||"",v2:c.v2||{},updated:tsd(c.updated),by:c.by||""};if(tab==="settings")drawSettings()}));
   unsub.push(F.onSnapshot(F.doc(db,"site","content"),d=>{CONTENT=d.exists()?d.data():{};if(tab==="content")drawContent()},()=>{}));
+  unsub.push(F.onSnapshot(F.query(F.collection(db,"activity"),F.orderBy("at","desc"),F.limit(300)),s=>{ACT=s.docs.map(d=>({id:d.id,...d.data()}));if(tab==="activity")drawActivity()},e=>console.warn("activity",e)));
+  unsub.push(F.onSnapshot(F.doc(db,"site","stocks"),d=>{const c=d.exists()?d.data():{};STK={add:c.add||[],remove:c.remove||[],edit:c.edit||{},updated:tsd(c.updated),by:c.by||""};if(tab==="stocks")drawStocks()},()=>{}));
   unsub.push(F.onSnapshot(F.collection(db,"blocked"),s=>{BLOCKED=Object.fromEntries(s.docs.map(d=>[d.id,d.data()]));if(tab==="users")draw()},()=>{}));
   unsub.push(F.onSnapshot(F.collection(db,"admins"),s=>{ADMINS=s.docs.map(d=>({id:d.id,...d.data()}));if(tab==="admins"||tab==="users")draw()},()=>{}));
   counts();
@@ -125,9 +128,10 @@ async function counts(){
     try{const s=await F.getDocs(F.query(F.collectionGroup(db,n),F.limit(5000)));
       s.docs.forEach(d=>{const u=d.ref.parent.parent.id;(C[u]??={portfolios:0,plans:0,reports:0,last:null})[n]++;
         const t=tsd(d.data().updated)||tsd(d.data().created);if(t&&(!C[u].last||t>C[u].last))C[u].last=t;
-        (C._items??=[]).push({kind:n,uid:u,id:d.id,name:d.data().name||"",sub:d.data().kind||"",t})})}catch(e){console.warn(n,e)}
+        (C._items??=[]).push({kind:n,uid:u,id:d.id,name:d.data().name||"",sub:d.data().kind||"",t});
+        if(n==="portfolios")(C._hold??=[]).push({uid:u,syms:(d.data().holdings||[]).map(h=>h&&h.sym).filter(Boolean)})})}catch(e){console.warn(n,e)}
   }
-  COUNTS=C;if(tab==="users"||tab==="saved"||tab==="data")draw();
+  COUNTS=C;if(["users","saved","data","stocks"].includes(tab))draw();
 }
 
 /* ---------- data feeds (from GitHub Actions + NSE/Yahoo/IIMA files) ---------- */
@@ -142,7 +146,7 @@ async function drawData(){
   const card=(lab,big,sub,h)=>`<div class="card"><div class="lab">${h?`<span class="dot ${h}"></span>`:""}${lab}</div><div class="big">${big}</div><div class="sub">${sub}</div></div>`;
   el.innerHTML=runPanel()+`<h2>Data feeds</h2><p class="note">These update on their own: prices every evening (8:30 pm IST), live prices every 15 minutes in market hours. The customer site reads the same files, so both sites always show the same data. This page refreshes every 5 minutes.</p>
   <div class="cards">
-    ${card("Daily prices (NSE + Yahoo)",meta?meta.count.toLocaleString("en-IN")+" stocks":"missing",meta?`Updated ${ago(mu)} · NSE close ${esc(meta.nse_date)}`:"meta.json not found",health(mu,30,54))}
+    ${card("Daily prices (Yahoo Finance)",meta?meta.count.toLocaleString("en-IN")+" stocks":"missing",meta?`Updated ${ago(mu)} · prices to ${esc(meta.last_date||meta.nse_date||"")}`:"meta.json not found",health(mu,30,54))}
     ${card("Live prices",lu?ago(lu):"—",live?`${live.n||0} quotes on ${esc(live.d||"")} · runs only in market hours`:"live.json not found",lu?health(lu,0.5,90):"warn")}
     ${card("Fundamentals",fund?Object.keys(fund.f).length+" stocks":"missing",fund?`Updated ${ago(fu)} · about 300 refresh a day`:"fund.json not found",health(fu,30,80))}
     ${card("Fama-French (IIMA)",meta&&meta.ff?esc(meta.ff.to):"—",meta&&meta.ff?`File ${esc(meta.ff.file||"")}`:"not loaded",meta&&meta.ff?"ok":"warn")}
@@ -299,6 +303,98 @@ function drawContent(){
     const hidden=FEATS.map(f=>f[0]).filter(k=>!el.querySelector(`.cShow[value="${k}"]`).checked);
     try{await F.setDoc(F.doc(db,"site","content"),{siteName:$("#cName").value.trim(),heroTitle:$("#cHT").value.trim(),heroText:$("#cHP").value.trim(),footer:$("#cFoot").value.trim(),names,hidden,updated:F.serverTimestamp(),by:user.email});toast("Saved. The customer site is updated.")}catch(e){toast("Not saved: "+e.code)}};
   $("#cReset").onclick=async()=>{const b=$("#cReset");if(!confirmTwice(b,"Tap again to restore"))return;try{await F.setDoc(F.doc(db,"site","content"),{updated:F.serverTimestamp(),by:user.email});toast("Original text restored")}catch(e){toast("Failed: "+e.code)}};
+}
+
+/* ---------- stocks & companies: list control, customer stocks, company changes ---------- */
+async function loadStockData(force){
+  if(force||!LISTR){const l=await j(DATA+"list.json?t="+Date.now());LISTR=l&&l.r?l.r.map(r=>Object.fromEntries(l.f.map((k,i)=>[k,r[i]]))):[]}
+  if(force||!CHG){CHG=(await j(DATA+"changes.json?t="+Date.now()))||{runs:[]}}
+}
+const SHD={};
+async function ensureShards(syms){
+  const shard=sy=>{const c=sy.slice(0,1).toUpperCase();return c>="A"&&c<="Z"?c:"0"};
+  const need=[...new Set(syms.filter(sy=>{const x=LISTR.find(y=>y.sym===sy);return x&&x.last==null}).map(shard))].filter(k=>!SHD[k]);
+  if(!need.length)return false;
+  await Promise.all(need.map(k=>SHD[k]=j(DATA+"u/"+k+".json").then(a=>{const m=Object.fromEntries(LISTR.map(x=>[x.sym,x]));for(const e of a||[])if(m[e.sym])Object.assign(m[e.sym],{last:e.last,chg:e.chg,date:e.date})})));
+  return true;
+}
+const KINDS=[["","Equity"],["ETF","ETF"],["REIT","REIT"],["InvIT","InvIT"]];
+async function saveStk(next,msg){try{await F.setDoc(F.doc(db,"site","stocks"),{add:next.add,remove:next.remove,edit:next.edit,updated:F.serverTimestamp(),by:user.email});toast(msg)}catch(e){toast("Not saved: "+e.code)}}
+async function drawStocks(){
+  const el=$("#body");if(!LISTR)el.innerHTML=`<p class="load">Loading the stock list…</p>`;
+  await loadStockData();if(tab!=="stocks")return;
+  const bySym=Object.fromEntries(LISTR.map(x=>[x.sym,x]));
+  // stocks customers use
+  const use={};(COUNTS._hold||[]).forEach(p=>{new Set(p.syms).forEach(sy=>{use[sy]=use[sy]||{p:0,u:new Set()};use[sy].p++;use[sy].u.add(p.uid)})});
+  const top=Object.entries(use).sort((a,b)=>b[1].u.size-a[1].u.size||b[1].p-a[1].p).slice(0,40);
+  const run=(CHG.runs||[])[0];
+  const q=stkQ.trim().toUpperCase(),hits=q?LISTR.filter(x=>(x.sym+" "+x.name).toUpperCase().includes(q)).slice(0,40):[];
+  const pend=STK.add.length+STK.remove.length+Object.keys(STK.edit).length;
+  const ev=r=>[...(r.added||[]).map(x=>["New listing",x.sym,x.name]),...(r.removed||[]).map(x=>["Removed",x.sym,x.name]),...(r.renamed||[]).map(x=>["Renamed",x.sym,`${x.from} → ${x.to}`]),
+    ...(r.sector||[]).map(x=>["Sector changed",x.sym,`${x.from||"–"} → ${x.to||"–"}`]),...(r.n5||[]).map(x=>[x.to?"Joined Nifty 500":"Left Nifty 500",x.sym,""]),
+    ...(r.events||[]).map(x=>[x.type==="dividend"?"Dividend":"Split / bonus / demerger",x.sym,`${x.date} · ${x.detail}`]),...(r.big||[]).map(x=>["Big move",x.sym,`${(x.chg*100).toFixed(1)}% in a day`])];
+  if(await ensureShards([...top.map(t=>t[0]),...hits.map(x=>x.sym)])){if(tab==="stocks")drawStocks();return}
+  el.innerHTML=`<h2>Stocks & companies</h2><p class="note">All prices now come from Yahoo Finance only. The stock list is controlled here: add, remove or edit a company, then run the price update (Data & updates tab) or wait for the evening update. The customer site uses the same list.</p>
+  <div class="cards"><div class="card"><div class="lab">Stocks on the site</div><div class="big">${LISTR.length.toLocaleString("en-IN")}</div><div class="sub">${LISTR.filter(x=>x.n5).length} in Nifty 500</div></div>
+  <div class="card"><div class="lab">Used by customers</div><div class="big">${Object.keys(use).length}</div><div class="sub">different stocks in saved portfolios</div></div>
+  <div class="card"><div class="lab">Changes waiting</div><div class="big">${pend}</div><div class="sub">${pend?"apply at the next price update":"none"}</div></div>
+  <div class="card"><div class="lab">Last update</div><div class="big">${run?esc(run.date):"–"}</div><div class="sub">${run?`${(run.events||[]).length} company events · ${(run.failed||[]).length} failed`:"change log starts with the next update"}</div></div></div>
+
+  <h3>Company changes in the latest update</h3>
+  ${run?(ev(run).length?`<div class="scroll"><table><thead><tr><th>Change</th><th>Stock</th><th>Detail</th></tr></thead><tbody>${ev(run).slice(0,150).map(([a,b,c])=>`<tr><td>${esc(a)}</td><td><b>${esc(b)}</b></td><td class="note">${esc(c)}</td></tr>`).join("")}</tbody></table></div>`:`<p class="note">No company changes on ${esc(run.date)}.</p>`)
+    +((CHG.runs||[]).length>1?`<details style="margin-top:8px"><summary>Earlier updates (${CHG.runs.length-1})</summary><div class="scroll"><table><thead><tr><th>Date</th><th class="n">Stocks</th><th class="n">New</th><th class="n">Removed</th><th class="n">Renamed</th><th class="n">Events</th><th class="n">Failed</th></tr></thead><tbody>${CHG.runs.slice(1).map(r=>`<tr><td>${esc(r.date)}</td><td class="n">${r.count}</td><td class="n">${(r.added||[]).length}</td><td class="n">${(r.removed||[]).length}</td><td class="n">${(r.renamed||[]).length}</td><td class="n">${(r.events||[]).length}</td><td class="n">${(r.failed||[]).length}</td></tr>`).join("")}</tbody></table></div></details>`:"")
+    :`<p class="note">The change log is written by each price update from now on.</p>`}
+
+  <h3>Stocks customers use</h3>
+  ${top.length?`<div class="scroll"><table><thead><tr><th>Stock</th><th class="n">Customers</th><th class="n">Portfolios</th><th class="n">Last price</th><th class="n">Day change</th></tr></thead><tbody>${top.map(([sy,v])=>{const x=bySym[sy]||{};return `<tr><td><b>${esc(sy)}</b> <span class="note">${esc(x.name||"not in list")}</span></td><td class="n">${v.u.size}</td><td class="n">${v.p}</td><td class="n">${x.last!=null?"₹"+Number(x.last).toLocaleString("en-IN"):"–"}</td><td class="n ${x.chg<0?"bad":"ok"}">${x.chg!=null?(x.chg*100).toFixed(2)+"%":"–"}</td></tr>`}).join("")}</tbody></table></div>`:`<p class="note">No saved portfolios yet.</p>`}
+
+  <h3>Manage the stock list</h3>
+  <div class="row"><input type="text" id="sq" placeholder="Search symbol or company" value="${esc(stkQ)}" style="max-width:320px"></div>
+  ${q?`<div class="scroll" style="margin-top:8px"><table><thead><tr><th>Symbol</th><th>Company</th><th>Sector</th><th>Type</th><th>Nifty 500</th><th class="n">Last</th><th></th></tr></thead><tbody>${hits.map(x=>{const e=STK.edit[x.sym]||{},rm=STK.remove.includes(x.sym);
+    return `<tr${rm?' style="opacity:.5"':""}><td><b>${esc(x.sym)}</b></td><td><input type="text" class="eN" data-s="${esc(x.sym)}" value="${esc(e.name??x.name)}"></td><td><input type="text" class="eI" data-s="${esc(x.sym)}" value="${esc(e.ind??x.ind??"")}" style="width:12em"></td><td class="note">${esc(x.k||"Equity")}</td><td><input type="checkbox" class="eF" data-s="${esc(x.sym)}" ${(e.n5??x.n5)?"checked":""}></td><td class="n">${x.last!=null?"₹"+Number(x.last).toLocaleString("en-IN"):"–"}</td>
+    <td style="white-space:nowrap"><button class="btn ghost sm" data-ed="${esc(x.sym)}">Save</button> ${rm?`<button class="btn ghost sm" data-unrm="${esc(x.sym)}">Keep</button>`:`<button class="btn red sm" data-rm="${esc(x.sym)}">Remove</button>`}</td></tr>`}).join("")||`<tr><td colspan="7" class="note">No match. Add it below.</td></tr>`}</tbody></table></div>`:""}
+  <div class="card" style="margin-top:12px"><b>Add a company</b><div class="row" style="margin-top:8px">
+    <input type="text" id="aS" placeholder="NSE symbol, e.g. TATAMOTORS" style="max-width:220px"><input type="text" id="aN" placeholder="Company name" style="max-width:260px"><input type="text" id="aI" placeholder="Sector (optional)" style="max-width:200px">
+    <select id="aK">${KINDS.map(([v,l])=>`<option value="${v}">${l}</option>`).join("")}</select><label class="chk"><input type="checkbox" id="aF"> Nifty 500</label><button class="btn" id="aGo">Add</button></div>
+    <p class="note">The symbol must be the NSE symbol; prices are read from Yahoo Finance as SYMBOL.NS. If Yahoo has no data for it, it appears in the failed list after the update.</p></div>
+  ${pend?`<h3>Waiting for the next update</h3><div class="scroll"><table><tbody>
+    ${STK.add.map((x,i)=>`<tr><td>Add</td><td><b>${esc(x.sym)}</b> ${esc(x.name)}</td><td><button class="btn ghost sm" data-undo="add/${i}">Undo</button></td></tr>`).join("")}
+    ${STK.remove.map((x,i)=>`<tr><td>Remove</td><td><b>${esc(x)}</b></td><td><button class="btn ghost sm" data-undo="remove/${i}">Undo</button></td></tr>`).join("")}
+    ${Object.entries(STK.edit).map(([k,v])=>`<tr><td>Edit</td><td><b>${esc(k)}</b> <span class="note">${esc([v.name,v.ind,v.n5!=null?(v.n5?"in Nifty 500":"not in Nifty 500"):""].filter(Boolean).join(" · "))}</span></td><td><button class="btn ghost sm" data-undo="edit/${esc(k)}">Undo</button></td></tr>`).join("")}
+  </tbody></table></div><p class="note">Saved changes stay in force: a removed stock stays removed and an edited name stays edited at every update. ${STK.updated?`Last change ${ago(STK.updated)} by ${esc(STK.by)}.`:""}</p>`:""}`;
+  const sq=$("#sq");sq.oninput=()=>{const p=sq.selectionStart;stkQ=sq.value;drawStocks().then(()=>{const n=$("#sq");n.focus();n.setSelectionRange(p,p)})};
+  const cur=()=>({add:STK.add.slice(),remove:STK.remove.slice(),edit:{...STK.edit}});
+  $("#aGo").onclick=()=>{const sym=$("#aS").value.trim().toUpperCase(),name=$("#aN").value.trim();
+    if(!/^[A-Z0-9&_-]{1,20}$/.test(sym)){toast("Enter a valid NSE symbol");return}if(bySym[sym]&&!STK.remove.includes(sym)){toast(sym+" is already on the site");return}
+    const n=cur();n.add=n.add.filter(x=>x.sym!==sym).concat({sym,name:name||sym,ind:$("#aI").value.trim(),k:$("#aK").value,n5:$("#aF").checked});n.remove=n.remove.filter(x=>x!==sym);saveStk(n,sym+" will be added at the next update")};
+  el.querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>{const sy=b.dataset.ed,x=bySym[sy],nm=el.querySelector(`.eN[data-s="${sy}"]`).value.trim(),ind=el.querySelector(`.eI[data-s="${sy}"]`).value.trim(),f=el.querySelector(`.eF[data-s="${sy}"]`).checked;
+    const e={};if(nm&&nm!==x.name)e.name=nm;if(ind!==(x.ind||""))e.ind=ind;if(!!f!==!!x.n5)e.n5=f;const n=cur();if(Object.keys(e).length)n.edit[sy]=e;else delete n.edit[sy];saveStk(n,"Saved; applies at the next update")});
+  el.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{if(!confirmTwice(b,"Sure?"))return;const n=cur();n.remove=[...new Set([...n.remove,b.dataset.rm])];saveStk(n,b.dataset.rm+" will be removed at the next update")});
+  el.querySelectorAll("[data-unrm]").forEach(b=>b.onclick=()=>{const n=cur();n.remove=n.remove.filter(x=>x!==b.dataset.unrm);saveStk(n,"Kept")});
+  el.querySelectorAll("[data-undo]").forEach(b=>b.onclick=()=>{const [k,i]=b.dataset.undo.split("/");const n=cur();if(k==="edit")delete n.edit[i];else n[k].splice(+i,1);saveStk(n,"Undone")});
+}
+
+/* ---------- live activity from the customer site ---------- */
+const ACTL={signin:"Signed in",view:"Opened",stocks:"Changed stocks",save_plan:"Saved a plan",save_report:"Saved a report"};
+const VIEWN=Object.fromEntries([...FEATS.map(f=>[f[0],f[1]]),["home","Home"],["mine","My saved"]]);
+function drawActivity(){
+  const el=$("#body"),now=Date.now(),day=ACT.filter(a=>{const t=tsd(a.at);return t&&now-t<864e5});
+  const list=ACT.filter(a=>!actF||a.type===actF);
+  const pages={};day.filter(a=>a.type==="view").forEach(a=>pages[a.detail]=(pages[a.detail]||0)+1);
+  el.innerHTML=`<h2>Activity</h2><p class="note">What signed-in customers do on the customer site, live. Visitors who are not signed in are not recorded.</p>
+  <div class="cards"><div class="card"><div class="lab">Last 24 hours</div><div class="big">${day.length}</div><div class="sub">${new Set(day.map(a=>a.uid)).size} customers</div></div>
+  <div class="card"><div class="lab">Sign-ins today</div><div class="big">${day.filter(a=>a.type==="signin").length}</div><div class="sub">last 24 hours</div></div>
+  <div class="card"><div class="lab">Most opened today</div><div class="big" style="font-size:20px">${esc(Object.entries(pages).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`${VIEWN[k]||k} ${v}`).join(" · ")||"–")}</div><div class="sub">page opens</div></div>
+  <div class="card"><div class="lab">Saves today</div><div class="big">${day.filter(a=>a.type.startsWith("save")).length}</div><div class="sub">plans and reports</div></div></div>
+  <div class="row" style="margin-bottom:10px"><select id="actF"><option value="">All activity</option>${Object.entries(ACTL).map(([k,l])=>`<option value="${k}" ${actF===k?"selected":""}>${l}</option>`).join("")}</select>
+  <button class="btn ghost sm" id="actOld">Delete activity older than 30 days</button></div>
+  <div class="scroll"><table><thead><tr><th>When</th><th>Customer</th><th>Did</th><th>Detail</th></tr></thead><tbody>
+  ${list.map(a=>`<tr><td>${ago(tsd(a.at))}<br><span class="note">${dt(tsd(a.at))}</span></td><td><a href="#" data-u="${esc(a.uid)}">${esc(a.email)}</a></td><td>${esc(ACTL[a.type]||a.type)}</td><td class="note">${esc(a.type==="view"?(VIEWN[a.detail]||a.detail):a.detail)}</td></tr>`).join("")||`<tr><td colspan="4" class="note">No activity yet.</td></tr>`}
+  </tbody></table></div><p class="note">Shows the latest 300 events.</p>`;
+  $("#actF").onchange=()=>{actF=$("#actF").value;drawActivity()};
+  el.querySelectorAll("[data-u]").forEach(a=>a.onclick=e=>{e.preventDefault();openUid=a.dataset.u;tab="users";document.querySelectorAll("[data-t]").forEach(x=>x.setAttribute("aria-selected",x.dataset.t==="users"));drawUser()});
+  $("#actOld").onclick=async()=>{const b=$("#actOld");if(!confirmTwice(b,"Tap again to delete"))return;b.disabled=true;
+    try{const cut=new Date(Date.now()-30*864e5),snap=await F.getDocs(F.query(F.collection(db,"activity"),F.where("at","<",cut),F.limit(500)));for(const d of snap.docs)await F.deleteDoc(d.ref);toast(`Deleted ${snap.docs.length} old events`)}catch(e){toast("Failed: "+e.code)}b.disabled=false};
 }
 </script>
 </body>

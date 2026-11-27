@@ -1,11 +1,12 @@
-"""Daily price updater for Portfolio Risk Lab.
+"""Daily price updater for Portfolio Risk Lab (Yahoo Finance only; no NSE servers).
 
 Runs on GitHub Actions every weekday evening:
-  1. gets the Nifty 500 stock list from NSE (falls back to the last saved list, then a built-in Nifty 100 list)
-  2. downloads up to 10 years of daily closing prices from Yahoo Finance (split/bonus adjusted, not dividend adjusted)
-  2b. replaces the latest day with NSE's official closing price from the NSE bhavcopy (if NSE can be reached)
-  3. writes data/stocks.json (the list), data/<SYMBOL>.json (prices) and data/meta.json (update time)
-Extra stocks: add lines "SYMBOL,Company name" to stocks.txt in the repository.
+  1. stock list = data/universe.json (the saved list) + changes made in the admin site (Firestore site/stocks:
+     add, remove, edit name / sector / Nifty 500 flag) + optional stocks.txt lines "SYMBOL,Company name"
+  2. downloads up to 10 years of daily closing prices from Yahoo Finance (split/bonus adjusted, dividends kept)
+  3. writes data/stocks.json, data/list.json, data/u/*.json, data/<SYMBOL>.json, data/meta.json
+  4. writes data/changes.json: what changed for each company (new, removed, renamed, splits/bonus, dividends,
+     failed downloads) so the admin site can show it
 """
 import datetime as dt
 import io
@@ -14,7 +15,6 @@ import os
 import re
 import sys
 import time
-import zipfile
 
 import pandas as pd
 import requests
@@ -23,8 +23,6 @@ import yfinance as yf
 OUT = "data"
 PERIOD = "10y"
 BATCH = 40
-EQUITY_URL = "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv"  # every stock listed on NSE
-ETF_URL = "https://nsearchives.nseindia.com/content/equities/eq_etfseclist.csv"  # every ETF listed on NSE
 # REITs and InvITs trade in series RR and IV. Used if NSE's list can't be read.
 TRUSTS = [
     ("EMBASSY", "Embassy Office Parks REIT", "REIT"),
@@ -38,14 +36,9 @@ TRUSTS = [
 KIND = {}  # symbol -> "ETF" / "REIT" / "InvIT"
 JUMP = 0.6  # a one-day fall below 60% (or rise above 1/0.6) of the day before is treated as a corporate action
 N500 = set()  # Nifty 500 symbols, marked "n5" in stocks.json
-LIST_URLS = [
-    "https://nsearchives.nseindia.com/content/indices/ind_nifty500list.csv",
-    "https://www.niftyindices.com/IndexConstituent/ind_nifty500list.csv",
-]
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
     "Accept": "text/csv,text/plain,*/*",
-    "Referer": "https://www.nseindia.com/",
 }
 FALLBACK = [
     ("RELIANCE", "Reliance Industries"),
@@ -154,95 +147,79 @@ def file_name(sym):
     return re.sub(r"[^A-Za-z0-9-]", "_", sym)
 
 
-def stock_list():
-    """Return a list of (symbol, name, industry)."""
-    for url in LIST_URLS:
-        try:
-            r = requests.get(url, headers=HEADERS, timeout=30)
-            r.raise_for_status()
-            df = pd.read_csv(io.StringIO(r.text))
-            df.columns = [c.strip() for c in df.columns]
-            rows = [(str(s).strip(), str(n).strip(), str(i).strip())
-                    for s, n, i in zip(df["Symbol"], df["Company Name"], df["Industry"])]
-            if len(rows) >= 100:
-                print(f"Nifty 500 list: {len(rows)} stocks from {url}")
-                N500.update(s for s, _, _ in rows)
-                return rows
-        except Exception as e:  # noqa: BLE001
-            print(f"Could not read {url}: {e}")
-    path = os.path.join(OUT, "stocks.json")
+FIRESTORE_DOC = "https://firestore.googleapis.com/v1/projects/risklab---karthi/databases/(default)/documents/site/stocks"
+
+
+def fs_value(v):
+    """Convert a Firestore REST value to plain Python."""
+    if "stringValue" in v: return v["stringValue"]
+    if "integerValue" in v: return int(v["integerValue"])
+    if "doubleValue" in v: return v["doubleValue"]
+    if "booleanValue" in v: return v["booleanValue"]
+    if "nullValue" in v: return None
+    if "timestampValue" in v: return v["timestampValue"]
+    if "arrayValue" in v: return [fs_value(x) for x in v["arrayValue"].get("values", [])]
+    if "mapValue" in v: return {k: fs_value(x) for k, x in v["mapValue"].get("fields", {}).items()}
+    return None
+
+
+def admin_changes():
+    """Stock-list changes saved in the admin site (public read, admin write). {} if not reachable."""
+    try:
+        r = requests.get(FIRESTORE_DOC, timeout=20)
+        if r.status_code == 404:
+            return {}
+        r.raise_for_status()
+        return {k: fs_value(v) for k, v in r.json().get("fields", {}).items()}
+    except Exception as e:  # noqa: BLE001
+        print(f"Admin stock changes not read: {e}")
+        return {}
+
+
+def universe():
+    """Return [(symbol, name, industry)] and fill KIND / N500. Source: data/universe.json, else stocks.json."""
+    path = os.path.join(OUT, "universe.json")
+    rows = []
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
-            old = json.load(f)["stocks"]
-        print(f"Using the saved list of {len(old)} stocks")
-        N500.update(s["sym"] for s in old if s.get("n5"))
-        return [(s["sym"], s["name"], s.get("ind", "")) for s in old]
-    print("Using the built-in Nifty 100 list")
-    N500.update(s for s, _ in FALLBACK)
-    return [(s, n, "") for s, n in FALLBACK]
-
-
-def all_equities():
-    """Every equity listed on NSE (series EQ and BE) from NSE's EQUITY_L file. Returns [] if NSE can't be reached."""
-    try:
-        s = requests.Session()
-        s.headers.update(HEADERS)
-        try:
-            s.get("https://www.nseindia.com", timeout=20)
-        except Exception:  # noqa: BLE001
-            pass
-        r = s.get(EQUITY_URL, timeout=30)
-        r.raise_for_status()
-        df = pd.read_csv(io.StringIO(r.text))
-        df.columns = [c.strip() for c in df.columns]
-        ser = df["SERIES"].astype(str).str.strip()
-        rows = [(str(s).strip(), str(n).strip(), "") for s, n in zip(df[ser.isin(["EQ", "BE"])]["SYMBOL"],
-                                                                     df[ser.isin(["EQ", "BE"])]["NAME OF COMPANY"])]
-        print(f"All NSE equities: {len(rows)} stocks")
-        for code, kind in (("RR", "REIT"), ("IV", "InvIT")):
-            part = df[ser == code]
-            for sym, name in zip(part["SYMBOL"], part["NAME OF COMPANY"]):
-                KIND[str(sym).strip()] = kind
-                rows.append((str(sym).strip(), str(name).strip(), kind))
-        return rows
-    except Exception as e:  # noqa: BLE001
-        print(f"Could not read the full NSE list: {e}")
-        return []
-
-
-def etfs_and_trusts():
-    """Every ETF on NSE, plus REITs and InvITs (from the built-in list; NSE's equity list adds the rest)."""
-    rows = []
+            rows = json.load(f)
+    elif os.path.exists(os.path.join(OUT, "stocks.json")):
+        with open(os.path.join(OUT, "stocks.json"), encoding="utf-8") as f:
+            rows = [{"sym": x["sym"], "name": x["name"], "ind": x.get("ind", ""), "k": x.get("k", ""), "n5": 1 if x.get("n5") else 0}
+                    for x in json.load(f)["stocks"] if not x["sym"].startswith("^")]
+    else:
+        rows = [{"sym": s, "name": n, "ind": "", "k": "", "n5": 1} for s, n in FALLBACK]
     for sym, name, kind in TRUSTS:
-        KIND[sym] = kind
-        rows.append((sym, name, kind))
-    try:
-        s = requests.Session()
-        s.headers.update(HEADERS)
-        try:
-            s.get("https://www.nseindia.com", timeout=20)
-        except Exception:  # noqa: BLE001
-            pass
-        r = s.get(ETF_URL, timeout=30)
-        r.raise_for_status()
-        df = pd.read_csv(io.StringIO(r.text))
-        df.columns = [c.strip() for c in df.columns]
-        sc = next(c for c in df.columns if c.lower() == "symbol")
-        nc = next((c for c in df.columns if c.lower().replace(" ", "") in ("securityname", "nameofsecurity")), sc)
-        uc = next((c for c in df.columns if c.lower() == "underlying"), None)
-        for i, row in df.iterrows():
-            sym = str(row[sc]).strip()
-            if not sym or sym == "nan":
-                continue
-            KIND[sym] = "ETF"
-            name = str(row[nc]).strip()
-            if uc and str(row[uc]).strip() not in ("", "nan"):
-                name = f"{name} ({str(row[uc]).strip()})"
-            rows.append((sym, name, "ETF"))
-        print(f"NSE ETFs: {len(df)}")
-    except Exception as e:  # noqa: BLE001
-        print(f"Could not read the NSE ETF list: {e}")
-    return rows
+        if not any(r["sym"] == sym for r in rows):
+            rows.append({"sym": sym, "name": name, "ind": kind, "k": kind, "n5": 0})
+    ch = admin_changes()
+    by = {r["sym"]: r for r in rows}
+    for x in ch.get("add") or []:
+        sym = str(x.get("sym", "")).strip().upper()
+        if re.fullmatch(r"[A-Z0-9&_-]{1,20}", sym):
+            by[sym] = {"sym": sym, "name": x.get("name") or sym, "ind": x.get("ind") or "", "k": x.get("k") or "", "n5": 1 if x.get("n5") else 0}
+    for sym, e in (ch.get("edit") or {}).items():
+        if sym in by and isinstance(e, dict):
+            for k in ("name", "ind", "k"):
+                if e.get(k) is not None:
+                    by[sym][k] = e[k]
+            if e.get("n5") is not None:
+                by[sym]["n5"] = 1 if e["n5"] else 0
+    for sym in ch.get("remove") or []:
+        by.pop(sym, None)
+    for sym, name, ind in extra_stocks():
+        by.setdefault(sym, {"sym": sym, "name": name, "ind": ind, "k": "", "n5": 0})
+    rows = sorted(by.values(), key=lambda r: r["sym"])
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(rows, f, separators=(",", ":"))
+    for r in rows:
+        if r.get("k"):
+            KIND[r["sym"]] = r["k"]
+        if r.get("n5"):
+            N500.add(r["sym"])
+    print(f"Stock list: {len(rows)} ({len(N500)} in Nifty 500); admin changes: "
+          f"{len(ch.get('add') or [])} added, {len(ch.get('remove') or [])} removed, {len(ch.get('edit') or {})} edited")
+    return [(r["sym"], r["name"], r.get("ind", "")) for r in rows]
 
 
 def drop_holidays(dates, vals):
@@ -274,85 +251,6 @@ def fix_jumps(dates, vals, dv=None):
     if adj:
         vals = [round(v, 2 if v >= 1 else 4) for v in vals]
     return vals, adj[::-1], dv or []
-
-
-def file_date(df, col, default):
-    """The trading date written inside a bhavcopy file (NSE returns the previous file on holidays)."""
-    try:
-        return pd.to_datetime(str(df[col].dropna().iloc[0]).strip(), dayfirst=col == "DATE1").date()
-    except Exception:  # noqa: BLE001
-        return default
-
-
-def nse_closes():
-    """Official closing prices from NSE's daily bhavcopy (end-of-day price file).
-    Tries today and the previous days until a file is found.
-    Returns (date "YYYY-MM-DD", {symbol: close}) or (None, {}) if NSE cannot be reached."""
-    s = requests.Session()
-    s.headers.update(HEADERS)
-    try:
-        s.get("https://www.nseindia.com", timeout=20)  # NSE sets cookies on its home page
-    except Exception:  # noqa: BLE001
-        pass
-    today = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=5, minutes=30)).date()
-    for back in range(0, 8):
-        d = today - dt.timedelta(days=back)
-        if d.weekday() >= 5:
-            continue
-        # 1) new-format bhavcopy (zip)
-        url = f"https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{d:%Y%m%d}_F_0000.csv.zip"
-        try:
-            r = s.get(url, timeout=30)
-            if r.ok and r.content[:2] == b"PK":
-                with zipfile.ZipFile(io.BytesIO(r.content)) as z:
-                    df = pd.read_csv(z.open(z.namelist()[0]))
-                df.columns = [c.strip() for c in df.columns]
-                fd = file_date(df, "TradDt", d)
-                if fd != d:  # market holiday: NSE serves the last trading day's file
-                    print(f"NSE file for {d} is dated {fd}; skipping")
-                    continue
-                df = df[df["SctySrs"].astype(str).str.strip().isin(["EQ", "BE", "BZ", "RR", "IV"])]
-                out = {str(k).strip(): float(v) for k, v in zip(df["TckrSymb"], df["ClsPric"]) if float(v) > 0}
-                if len(out) > 500:
-                    print(f"NSE bhavcopy {d}: {len(out)} closing prices")
-                    return d.isoformat(), out
-        except Exception as e:  # noqa: BLE001
-            print(f"NSE zip {d}: {e}")
-        # 2) full bhavcopy (csv)
-        url = f"https://nsearchives.nseindia.com/products/content/sec_bhavdata_full_{d:%d%m%Y}.csv"
-        try:
-            r = s.get(url, timeout=30)
-            if r.ok and r.text.lstrip().upper().startswith("SYMBOL"):
-                df = pd.read_csv(io.StringIO(r.text))
-                df.columns = [c.strip() for c in df.columns]
-                fd = file_date(df, "DATE1", d)
-                if fd != d:
-                    print(f"NSE full file for {d} is dated {fd}; skipping")
-                    continue
-                df = df[df["SERIES"].astype(str).str.strip().isin(["EQ", "BE", "BZ", "RR", "IV"])]
-                out = {str(k).strip(): float(v) for k, v in zip(df["SYMBOL"], df["CLOSE_PRICE"]) if float(v) > 0}
-                if len(out) > 500:
-                    print(f"NSE full bhavcopy {d}: {len(out)} closing prices")
-                    return d.isoformat(), out
-        except Exception as e:  # noqa: BLE001
-            print(f"NSE csv {d}: {e}")
-    print("NSE bhavcopy not reachable; using Yahoo prices only")
-    return None, {}
-
-
-def with_nse(sym, dates, vals, nse_date, nse):
-    """Put NSE's official close on the latest day (replace the same day, or add a newer day)."""
-    if not nse_date or sym not in nse:
-        return dates, vals, False
-    dates, vals = list(dates), list(vals)
-    if dates and dates[-1] == nse_date:
-        vals[-1] = round(nse[sym], 2)
-    elif not dates or dates[-1] < nse_date:
-        dates.append(nse_date)
-        vals.append(round(nse[sym], 2))
-    else:
-        return dates, vals, False
-    return dates, vals, True
 
 
 def extra_stocks():
@@ -540,13 +438,16 @@ def download(tickers):
 def main():
     os.makedirs(OUT, exist_ok=True)
     seen, stocks = set(), []
-    for sym, name, ind in stock_list() + extra_stocks() + all_equities() + etfs_and_trusts():
+    old_list = {}
+    if os.path.exists(os.path.join(OUT, "stocks.json")):
+        with open(os.path.join(OUT, "stocks.json"), encoding="utf-8") as f:
+            old_list = {x["sym"]: x for x in json.load(f)["stocks"]}
+    for sym, name, ind in universe():
         if sym not in seen:
             seen.add(sym)
             stocks.append((sym, name, ind))
 
     global MKT
-    nse_date, nse = nse_closes()
     nifty = None
     df = download(["^NSEI"])
     s = None if df is None else closes(df, "^NSEI")
@@ -617,7 +518,7 @@ def main():
             print(f"Factor {name}: {len(fv)} days")
         except Exception as e:  # noqa: BLE001
             print(f"Factor {name} failed: {e}")
-    saved, failed, from_nse = [], [], 0
+    saved, failed, events = [], [], []
     for i in range(0, len(stocks), BATCH):
         part = stocks[i:i + BATCH]
         tickers = [s + ".NS" for s, _, _ in part]
@@ -631,12 +532,11 @@ def main():
                     with open(path, encoding="utf-8") as f:
                         old = json.load(f)
                     if old.get("d"):
-                        d2, v2, used = with_nse(sym, old["d"], old["c"], nse_date, nse)
+                        d2, v2 = old["d"], old["c"]
                         dv = old.get("dv", [])
                         v2, adj, dv = fix_jumps(d2, v2, dv)
-                        from_nse += used
                         alladj = old.get("adj", []) + adj
-                        if used or adj:
+                        if adj:
                             with open(path, "w", encoding="utf-8") as f:
                                 json.dump({"s": sym, "d": d2, "c": v2, **({"dv": dv} if dv else {}),
                                            **({"adj": alladj} if alladj else {})}, f, separators=(",", ":"))
@@ -644,11 +544,26 @@ def main():
                 continue
             dates = [d.strftime("%Y-%m-%d") for d in s.index]
             vals = [round(float(v), 2) for v in s.values]
-            dates, vals, used = with_nse(sym, dates, vals, nse_date, nse)
             dates, vals = drop_holidays(dates, vals)
             dv = [x for x in dividends(df, t) if x[0] >= dates[0]]
+            old_dv, old_adj = [], []
+            if os.path.exists(path):
+                try:
+                    with open(path, encoding="utf-8") as f:
+                        o = json.load(f)
+                    old_dv, old_adj = o.get("dv", []), o.get("adj", [])
+                except Exception:  # noqa: BLE001
+                    pass
             vals, adj, dv = fix_jumps(dates, vals, dv)
-            from_nse += used
+            seen_dv = {x[0] for x in old_dv}
+            for d0, a0 in dv:
+                if d0 not in seen_dv and d0 >= (dt.date.today() - dt.timedelta(days=20)).isoformat():
+                    events.append({"sym": sym, "type": "dividend", "date": d0, "detail": f"₹{a0} a share"})
+            seen_adj = {json.dumps(x) for x in old_adj}
+            for x in adj:
+                if json.dumps(x) not in seen_adj and os.path.exists(path):
+                    events.append({"sym": sym, "type": "split/bonus/demerger", "date": str(x[0]) if isinstance(x, list) and x else "",
+                                   "detail": f"price gap adjusted, factor {x[1]}" if isinstance(x, list) and len(x) > 1 else "price gap adjusted"})
             with open(path, "w", encoding="utf-8") as f:
                 json.dump({"s": sym, "d": dates, "c": vals, **({"dv": dv} if dv else {}),
                            **({"adj": adj} if adj else {})}, f, separators=(",", ":"))
@@ -665,11 +580,38 @@ def main():
     split_for_site(saved)
     with open(os.path.join(OUT, "meta.json"), "w", encoding="utf-8") as f:
         json.dump({"updated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes"),
-                   "count": len(saved), "failed": failed, "nse_date": nse_date, "nse_count": from_nse,
+                   "count": len(saved), "failed": failed, "last_date": max(x["date"] for x in saved),
                    "nifty": nifty, "indices": indices, "ff": ff, "apt": apt,
-                   "source": (f"Latest close: NSE bhavcopy {nse_date}. " if nse_date else "")
-                             + "History: Yahoo Finance daily closes, split and bonus adjusted; demerger gaps removed; dividends added for total return"}, f)
-    print(f"Saved {len(saved)} stocks ({from_nse} with NSE's official close). Failed: {len(failed)} {failed[:20]}")
+                   "source": "Yahoo Finance daily closes, split and bonus adjusted; demerger gaps removed; dividends added for total return"}, f)
+    print(f"Saved {len(saved)} stocks. Failed: {len(failed)} {failed[:20]}")
+    write_changes(old_list, saved, failed, events)
+
+
+def write_changes(old, saved, failed, events):
+    """Append today's company changes to data/changes.json (last 90 runs) for the admin site."""
+    new = {x["sym"]: x for x in saved}
+    added = [{"sym": s, "name": new[s]["name"]} for s in new if s not in old]
+    removed = [{"sym": s, "name": old[s]["name"]} for s in old if s not in new and not s.startswith("^")]
+    renamed = [{"sym": s, "from": old[s]["name"], "to": new[s]["name"]} for s in new if s in old and old[s]["name"] != new[s]["name"]]
+    sector = [{"sym": s, "from": old[s].get("ind", ""), "to": new[s].get("ind", "")} for s in new if s in old and old[s].get("ind", "") != new[s].get("ind", "")]
+    n5 = [{"sym": s, "to": bool(new[s].get("n5"))} for s in new if s in old and bool(old[s].get("n5")) != bool(new[s].get("n5"))]
+    big = sorted(({"sym": s, "chg": new[s]["chg"], "name": new[s]["name"]} for s in new if abs(new[s].get("chg") or 0) >= 0.1),
+                 key=lambda x: -abs(x["chg"]))[:30]
+    run = {"at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes"), "date": max(x["date"] for x in saved),
+           "count": len(saved), "added": added, "removed": removed, "renamed": renamed, "sector": sector, "n5": n5,
+           "events": events[:300], "big": big, "failed": failed}
+    path = os.path.join(OUT, "changes.json")
+    runs = []
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                runs = json.load(f).get("runs", [])
+        except Exception:  # noqa: BLE001
+            runs = []
+    runs = [run] + runs[:89]
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"runs": runs}, f, separators=(",", ":"))
+    print(f"Changes: {len(added)} new, {len(removed)} removed, {len(renamed)} renamed, {len(events)} corporate events")
 
 
 APT_FACTORS = [  # (Yahoo ticker, key, name) macro factors for APT

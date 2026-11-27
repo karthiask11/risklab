@@ -200,7 +200,7 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
 </header>
 <div id="siteBanner" class="sitebanner" hidden></div>
 <main id="main"></main>
-<footer>Portfolio Risk Lab · a free, non-commercial student project for learning portfolio maths · <b>Not investment advice.</b> The maker is not registered with SEBI as an investment adviser or research analyst; nothing here is a recommendation to buy or sell. Results use past data and do not predict the future. Built with the help of AI (Claude). Prices: NSE bhavcopy and Yahoo Finance, about 15 minutes delayed during market hours. ·
+<footer>Portfolio Risk Lab · a free, non-commercial student project for learning portfolio maths · <b>Not investment advice.</b> The maker is not registered with SEBI as an investment adviser or research analyst; nothing here is a recommendation to buy or sell. Results use past data and do not predict the future. Built with the help of AI (Claude). Prices: Yahoo Finance, about 15 minutes delayed during market hours. ·
 <span id="footX"></span><button class="add" id="privBtn" type="button" style="border:0;padding:0">Privacy</button> · <button class="add" id="eduBtn" type="button" style="border:0;padding:0">Education mode</button></footer>
 <div class="toast" id="toast" role="status"></div>
 
@@ -222,8 +222,9 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
   <div class="dh"><h2 id="prT">Privacy</h2><button class="x" id="prClose" aria-label="Close">×</button></div>
   <div style="padding:0 16px 18px;font-size:15px;line-height:1.5">
     <p><b>Without signing in</b> nothing about you leaves your device. Your holdings are kept only in your browser (local storage).</p>
-    <p><b>If you sign in</b>, we store your email address, your name from Google (if you use Google) and the portfolios you save. They are stored in Google Firebase so you can open them on any device. Only you can read them; database rules block everyone else.</p>
-    <p>We use this data only to show you your portfolios. We do not sell or share it, show ads, or use tracking or analytics cookies.</p>
+    <p><b>If you sign in</b>, we store your email address, your name from Google (if you use Google) and the portfolios, plans and reports you save. They are stored in Google Firebase so you can open them on any device. Only you and the site's admin can read them; database rules block everyone else.</p>
+    <p><b>Activity log:</b> while you are signed in, the site records when you sign in, which tools you open, the stocks in your saved portfolios and when you save something, so the admin can run and improve the site.</p>
+    <p>We use this data only to run the site and show you your work. We do not sell or share it, show ads, or use tracking or analytics cookies.</p>
     <p><b>Your choices:</b> rename or delete any portfolio, or delete your whole account and all saved portfolios with “Delete account” at the top of the page after signing in.</p>
     <p class="note">Questions or requests: open an issue at github.com/karthiask11/risklab. This notice follows the Digital Personal Data Protection Act, 2023.</p>
   </div>
@@ -294,7 +295,7 @@ footer{border-top:1px solid var(--rule);padding:18px max(5vw,16px);font-size:13p
   </section>
   <section class="faq">
     <h2>Questions</h2>
-    <details><summary>Where do the prices come from?</summary><p>The latest day's price is NSE's official closing price from the NSE bhavcopy (NSE's end-of-day price file). Older daily prices come from Yahoo Finance, adjusted for splits and bonus issues but not dividends. Prices update every weekday evening after NSE publishes its file.</p></details>
+    <details><summary>Where do the prices come from?</summary><p>All prices come from Yahoo Finance: daily closing prices, adjusted for splits and bonus issues, with dividends added back for total return. They update every weekday evening after the market closes, and every 15 minutes during market hours.</p></details>
     <details><summary>What does "risk" mean here?</summary><p>Risk is the standard deviation of daily returns, turned into a yearly figure (daily SD × √252). It shows how much the return usually swings above or below its average.</p></details>
     <details><summary>Is this investment advice?</summary><p>No. It measures what happened in the past to help you learn and compare. Past risk and return do not predict the future.</p></details>
     <details><summary>Is my portfolio private?</summary><p>Yes. Without signing in, holdings stay only in your browser. If you sign in, your portfolios are stored in your own private space in the database; security rules let only you read or change them.</p></details>
@@ -523,7 +524,7 @@ function ensureInfo(syms){
   const need=[...new Set(syms.filter(s=>s&&STOCKS[s]&&!STOCKS[s].m&&!s.startsWith("^")).map(shardOf))];
   return Promise.allSettled(need.map(k=>SHARDS[k]??=fetch("data/u/"+k+".json",{cache:"no-cache"}).then(r=>r.ok?r.json():[]).catch(()=>[]).then(a=>{for(const x of a)if(STOCKS[x.sym])Object.assign(STOCKS[x.sym],x);for(const x of LIST)if(!x.m&&shardOf(x.sym)===k)x.m={}})));
 }
-const lastDate=()=>{let d="";for(const x of LIST)if(x.date&&x.date>d)d=x.date;return d||(meta&&meta.nse_date)||""};
+const lastDate=()=>{let d="";for(const x of LIST)if(x.date&&x.date>d)d=x.date;return d||(meta&&(meta.last_date||meta.nse_date))||""};
 async function boot(){
   try{
     /* light search list for every stock; full numbers only for the Nifty 500 now, the rest on demand */
@@ -727,7 +728,7 @@ function status(){
   if(EDU_CUT){s.innerHTML=`<b>Education mode</b> · ${LIST.length} NSE stocks · data up to ${esc(fmtD(EDU_CUT))} (SEBI 30-day rule) · <button class="add" id="eduOff" type="button" style="padding:0 8px">Turn off</button>`;$("#eduOff").onclick=()=>setEdu(false);return}
   if(sample){s.innerHTML="<b>Sample data</b> · TCS, INFY, HDFCBANK to 23 Nov 2026";return}
   const last=lastDate();
-  const nse=meta&&meta.nse_date?` · official NSE close for ${esc(fmtD(meta.nse_date))}`:"";
+  const nse="";
   if(LIVE){const tm=new Date(LIVE.t).toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",timeZone:"Asia/Kolkata"}),nf=LIVE.nifty?` · Nifty 50 ${num(LIVE.nifty[0],0)} <span class="${cls(LIVE.nifty[1])}">${LIVE.nifty[1]>=0?"+":""}${pct(LIVE.nifty[1],2)}</span>`:"";
     s.innerHTML=`<b>${LIST.length} NSE stocks</b> · <b>market prices at ${esc(tm)}</b> (about 15 min delayed, refresh every 15 min)${nf} · risk and return use daily closes`;return}
   s.innerHTML=`<b>${LIST.length} NSE stocks</b> · prices to ${esc(fmtD(last))}${nse} · updated every weekday evening`;
@@ -1676,6 +1677,9 @@ function applyContent(){
   if(curView()==="home")homeContent();
 }
 function homeContent(){const h=$("#heroT"),p=$("#heroP");if(h&&CONTENT.heroTitle)h.textContent=CONTENT.heroTitle;if(p&&CONTENT.heroText)p.textContent=CONTENT.heroText;const fb=$("#featBtns");if(fb)fb.innerHTML=featHTML()}
+const ACT_SEEN=new Set();let lastStocks=null;
+function logAct(type,detail,once){if(!(FB&&user)||blocked)return;if(once!==undefined){const k=type+"|"+once;if(ACT_SEEN.has(k))return;ACT_SEEN.add(k)}
+  try{FB.F.addDoc(FB.F.collection(FB.db,"activity"),{uid:user.uid,email:(user.email||"").slice(0,200),type,detail:String(detail||"").slice(0,300),at:FB.F.serverTimestamp()}).catch(()=>{})}catch(e){}}
 let fbFail=false,SITE={gated:["plan","portfolio","perf","screen","single","pair"],banner:""},authReady=false,MY={plans:[],reports:[]};
 const gatedView=v=>(v==="mine"||SITE.gated.includes(v))&&(!user||!!blocked)&&!fbFail;
 function gateHTML(v){const f=v==="mine"?["mine","My saved work","Your saved plans, reports and portfolios"]:[v,...featName(v)];
@@ -1703,7 +1707,7 @@ async function savePlan(){
   if(needSignIn())return;if(!state.ips){toast("Finish the plan first");return}
   askName("Name for this plan","Plan "+new Date().toLocaleDateString("en-GB"),async n=>{try{const F=FB.F;
     await F.addDoc(subcol("plans"),{name:n,ips:JSON.parse(JSON.stringify(state.ips)),created:F.serverTimestamp(),updated:F.serverTimestamp()});
-    toast("Plan saved to your account");loadMine()}catch(e){toast("Not saved: "+authErr(e))}});
+    toast("Plan saved to your account");logAct("save_plan",n);loadMine()}catch(e){toast("Not saved: "+authErr(e))}});
 }
 function drawMyPlans(){const el=$("#myPlans");if(!el)return;
   if(!user){el.innerHTML="";return}
@@ -1714,7 +1718,7 @@ function drawMyPlans(){const el=$("#myPlans");if(!el)return;
 async function saveReport(kind,data){
   if(needSignIn())return;
   askName("Name for this report",(kind==="perf"?"Performance ":"Portfolio ")+new Date().toLocaleDateString("en-GB"),async n=>{try{const F=FB.F;
-    await F.addDoc(subcol("reports"),{name:n,kind,data,created:F.serverTimestamp()});toast("Report saved to your account");loadMine()}catch(e){toast("Not saved: "+authErr(e))}});
+    await F.addDoc(subcol("reports"),{name:n,kind,data,created:F.serverTimestamp()});toast("Report saved to your account");logAct("save_report",(kind==="perf"?"Performance: ":"Portfolio: ")+n);loadMine()}catch(e){toast("Not saved: "+authErr(e))}});
 }
 const REPF={risk:["Risk","p"],return:["Return","p"],twrr:["TWRR","p"],xirr:["XIRR","p"],bench_twrr:["Benchmark","p"],sharpe:["Sharpe","n2"],beta:["Beta","n2"],value:["Value ₹","n0"],invested:["Invested ₹","n0"],stocks:["Stocks","s"],period:["Period","s"],holdings:["Holdings","s"]};
 function repLine(d){return Object.entries(REPF).filter(([k])=>d[k]!=null&&d[k]!=="").map(([k,[l,f]])=>{const v=d[k];return `<span class="kv">${l} <b>${esc(f==="p"?pct(v,1):f==="n2"?num(v,2):f==="n0"?num(v,0):String(v))}</b></span>`}).join(" · ")}
@@ -1956,7 +1960,7 @@ async function fbInit(){
     const a=app.initializeApp(FBCFG);FB={A,F,auth:A.getAuth(a),db:F.getFirestore(a)};
     loadSite();loadContent();
     A.onAuthStateChanged(FB.auth,u=>{const was=!!user;user=u;authReady=true;watchBlocked(u);acct();
-      if(u){$("#authDlg").open&&$("#authDlg").close();touchProfile(u);loadCloud();loadMine()}else{cloud=[];curId=null;MY={plans:[],reports:[]};if(onPortfolio())drawCloud()}
+      if(u){$("#authDlg").open&&$("#authDlg").close();touchProfile(u);setTimeout(()=>{logAct("signin","",u.uid);logAct("view",curView(),curView())},1500);loadCloud();loadMine()}else{cloud=[];curId=null;MY={plans:[],reports:[]};if(onPortfolio())drawCloud()}
       if(was!==!!u||!was)route()});
     acct();
   }catch(e){FB=null;fbFail=true;$("#acct").innerHTML="";console.warn("Sign-in unavailable",e);if(gatedHTMLShown())route();else if($("#featBtns"))$("#featBtns").innerHTML=featHTML()}
@@ -2013,13 +2017,13 @@ async function loadCloud(pick){
   }catch(e){cloudMsg="Could not load your portfolios: "+authErr(e);if(onPortfolio())drawCloud()}
 }
 function openCloud(c){
-  curId=c.id;state.holdings=clean(c.holdings);state.tx=cleanTx(c.tx);if(c.ips&&typeof c.ips==="object")state.ips=c.ips;state.mode=c.mode==="wt"?"wt":"qty";setPeriod(+c.period||state.period||1);
+  curId=c.id;state.holdings=clean(c.holdings);lastStocks=state.holdings.map(h=>h.sym).join(", ");state.tx=cleanTx(c.tx);if(c.ips&&typeof c.ips==="object")state.ips=c.ips;state.mode=c.mode==="wt"?"wt":"qty";setPeriod(+c.period||state.period||1);
   try{localStorage.setItem("rrlab:state",JSON.stringify(state))}catch(e){}
   if(onPortfolio())route();
 }
 function cloudSave(){
   if(!(FB&&user&&curId))return;clearTimeout(cloudT);
-  cloudT=setTimeout(async()=>{try{await FB.F.updateDoc(FB.F.doc(pcol(),curId),{...payload(),updated:FB.F.serverTimestamp()});const c=cloud.find(x=>x.id===curId);if(c)Object.assign(c,payload(),{updated:{toDate:()=>new Date()}});cloudMsg="Saved to your account at "+new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})+".";const m=$("#cloudMsg");if(m)m.textContent=cloudMsg}catch(e){cloudMsg="Not saved: "+authErr(e);const m=$("#cloudMsg");if(m)m.textContent=cloudMsg}},800);
+  cloudT=setTimeout(async()=>{try{await FB.F.updateDoc(FB.F.doc(pcol(),curId),{...payload(),updated:FB.F.serverTimestamp()});const c=cloud.find(x=>x.id===curId);{const sy=state.holdings.map(h=>h.sym).join(", ");if(sy!==lastStocks){lastStocks=sy;logAct("stocks",(c&&c.name?c.name+": ":"")+sy)}}if(c)Object.assign(c,payload(),{updated:{toDate:()=>new Date()}});cloudMsg="Saved to your account at "+new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})+".";const m=$("#cloudMsg");if(m)m.textContent=cloudMsg}catch(e){cloudMsg="Not saved: "+authErr(e);const m=$("#cloudMsg");if(m)m.textContent=cloudMsg}},800);
 }
 let nameCb=null;
 function askName(title,val,cb){nameCb=cb;$("#nTitle").textContent=title;$("#nIn").value=val||"";const d=$("#nameDlg");d.showModal?d.showModal():d.setAttribute("open","");setTimeout(()=>$("#nIn").select(),50)}
@@ -2068,6 +2072,7 @@ function route(){
   document.title=tab==="home"?SITENAME():nm(tab)+" · "+SITENAME();
   if(hiddenView(tab)){$("#main").innerHTML=`<section class="gate panel"><h2>${esc(nm(tab))}</h2><p>This page is turned off for now.</p><a class="btn" href="./" data-v="home" style="display:inline-flex;text-decoration:none">Go to home</a></section>`;token++;return}
   document.querySelectorAll("#tabs a").forEach(a=>a.toggleAttribute("aria-current",a.dataset.v===tab));
+  if(user&&!blocked)logAct("view",tab,tab);
   if(gatedView(tab)){$("#main").innerHTML=gateHTML(tab==="mine"?"mine":tab);token++;return}
   const [tid,fn]=views[tab];$("#main").replaceChildren($("#"+tid).content.cloneNode(true));token++;fn();
   if(tab==="portfolio"||tab==="perf")drawCloud();
