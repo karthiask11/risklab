@@ -721,9 +721,9 @@ function renderPortfolio(){
     <p class="note">Each dot is a stock; the ring is your portfolio${mS?"; the hollow dot is "+BN():""}. Higher is more return, further right is more risk. ${A.dates.length-1} daily returns, ${fmtD(A.dates[0])} to ${fmtD(A.dates.at(-1))}.</p></div>`+shortNote(A);
     draw($("#pfig"),(W,Hh)=>scatter(W,Hh,[...P.S.map((s,i)=>({x:s.ak,y:s.ar,label:use[i].sym})),...(mS?[{x:mS.ak,y:mS.ar,label:BN().toUpperCase(),min:1}]:[]),{x:P.risk,y:P.ret,label:"Portfolio",main:1}]));
     const heat=c=>`background:color-mix(in srgb,${c<0?"var(--red)":"var(--teal)"} ${Math.round(Math.abs(c)*70)}%,var(--bg))`;
-    const opt=k>1?optimise(A,P,use,w,beta):null;
+    const opt=k>1&&MOD("markowitz")?optimise(A,P,use,w,beta):null;
     lastExport={A,P,use,w,beta,pb,psh,mS,opt};
-    $("#pdetail").innerHTML=simpleHTML(A,P,use,w,beta,pb,psh,mS,q?t:0)+shortHTML(SH,use)+healthHTML(use,w,P)+allocHTML(use,w,q?t:0)+badDaysHTML(A,w,use,rf,q?t:0,mS)+expHTML(use,w,beta,P,mS,q?t:0)+mcHTML(P,pb,q?t:0)+(opt?opt.html:"")+attribHTML(use,w,P)+relHTML(A,w,mret,mrd,P,rf,pb)+stressHTML(use,w,beta,q?t:0)+brinsonHTML(use,w)+stratHTML(A,P,use,w,beta,rf)+rebalHTML(use)+feeHTML(P)+`<div id="models"></div>`+`<section><h2>Each stock</h2><div class="scroll"><table><thead><tr><th>Stock</th><th>Weight</th><th>Return</th><th>Risk</th><th>Sharpe</th><th class="hide-s">Beta</th><th>Risk share</th><th class="hide-s">Total return</th><th class="hide-s">CAGR</th></tr></thead><tbody>${
+    $("#pdetail").innerHTML=simpleHTML(A,P,use,w,beta,pb,psh,mS,q?t:0)+shortHTML(SH,use)+healthHTML(use,w,P)+allocHTML(use,w,q?t:0)+badDaysHTML(A,w,use,rf,q?t:0,mS)+(MOD("capm")?expHTML(use,w,beta,P,mS,q?t:0):"")+mcHTML(P,pb,q?t:0)+(opt?opt.html:"")+attribHTML(use,w,P)+relHTML(A,w,mret,mrd,P,rf,pb)+stressHTML(use,w,beta,q?t:0)+brinsonHTML(use,w)+stratHTML(A,P,use,w,beta,rf)+rebalHTML(use)+feeHTML(P)+`<div id="models"></div>`+`<section><h2>Each stock</h2><div class="scroll"><table><thead><tr><th>Stock</th><th>Weight</th><th>Return</th><th>Risk</th><th>Sharpe</th><th class="hide-s">Beta</th><th>Risk share</th><th class="hide-s">Total return</th><th class="hide-s">CAGR</th></tr></thead><tbody>${
       P.S.map((s,i)=>`<tr><td><b>${esc(use[i].sym)}</b></td><td class="n">${pct(w[i],1)}</td><td class="n ${cls(s.ar)}">${pct(s.ar,1)}</td><td class="n">${pct(s.ak,1)}</td><td class="n">${fx((s.ar-rf)/s.ak)}</td><td class="n hide-s">${Number.isFinite(beta[i])?beta[i].toFixed(2):"–"}</td><td class="n">${pct(P.contrib[i],1)}</td><td class="n hide-s ${cls(s.pr)}">${pct(s.pr,1)}</td><td class="n hide-s ${cls(s.cagr)}">${pct(s.cagr,1)}</td></tr>`).join("")}
       ${mS?`<tr><td><i>${BN()}</i></td><td></td><td class="n ${cls(mS.ar)}">${pct(mS.ar,1)}</td><td class="n">${pct(mS.ak,1)}</td><td class="n">${fx((mS.ar-rf)/mS.ak)}</td><td class="n hide-s">1.00</td><td></td><td class="n hide-s ${cls(mS.pr)}">${pct(mS.pr,1)}</td><td class="n hide-s ${cls(mS.cagr)}">${pct(mS.cagr,1)}</td></tr>`:""}</tbody></table></div>
       <p class="note">Sharpe = (return − risk-free rate) ÷ risk; higher is better. Beta above 1 moves more than ${BN()}, below 1 moves less. Risk share: how much of the portfolio's risk comes from each stock.</p></section>
@@ -829,23 +829,24 @@ function ols(y,X){ // least squares with intercept in X[0]; returns coefficients
 const levelMap=e=>{const m=new Map(e.d.map((d,i)=>[d,e.c[i]]));return {m,d:e.d,c:e.c}};
 function levelOn(L,d){if(L.m.has(d))return L.m.get(d);let lo=0,hi=L.d.length-1,r=-1;while(lo<=hi){const k=(lo+hi)>>1;if(L.d[k]<=d){r=k;lo=k+1}else hi=k-1}return r>=0?L.c[r]:NaN}
 async function modelsHTML(A,use,w,beta){
-  const box=$("#models");if(!box)return;const ff=meta&&meta.ff,apt=meta&&meta.apt||{};
+  const box=$("#models");if(!box)return;if(!MOD("capm")&&!MOD("ff")&&!MOD("apt")){box.innerHTML="";return}const ff=MOD("ff")&&meta&&meta.ff,apt=MOD("apt")&&meta&&meta.apt||{};
   if(!ff&&!Object.keys(apt).length){box.innerHTML="";return}
   box.innerHTML=`<section style="margin-top:28px"><h2>Return models compared ${tip("models")}</h2><p class="load">Running the factor regressions…</p></section>`;
   const t0=token;
   try{
+    await ensureInfo(["LTGILTBEES","GOLDBEES"]);
     const [F,...AP]=await Promise.all([ff?getFile(ff.file).catch(()=>null):null,...["USDINR","BRENT"].map(k=>apt[k]?getFile(apt[k].file).catch(()=>null):null),
       ...["LTGILTBEES","GOLDBEES"].map(s=>STOCKS[s]?ensure(s).catch(()=>null):null)]);
     if(t0!==token)return;
     const rf=state.rf,erm=state.erm??ermDefault(),mkt=STOCKS[IDX]&&store[IDX]?levelMap({d:store[IDX].map(x=>x[0]),c:store[IDX].map(x=>x[1])}):null;
     const ext=[AP[0]?levelMap(AP[0]):null,AP[1]?levelMap(AP[1]):null,store.LTGILTBEES?levelMap({d:(store.LTGILTBEES.tr||store.LTGILTBEES).map(x=>x[0]),c:(store.LTGILTBEES.tr||store.LTGILTBEES).map(x=>x[1])}):null,store.GOLDBEES?levelMap({d:store.GOLDBEES.map(x=>x[0]),c:store.GOLDBEES.map(x=>x[1])}):null];
     const ffm=F?new Map(F.d.map((d,i)=>[d,i])):null,P=ff&&ff.premia||{};
-    const gm=x=>STOCKS[x]&&(STOCKS[x].m["10"]||STOCKS[x].m["5"]),giltP=gm("LTGILTBEES")?gm("LTGILTBEES")[3]-rf:0,goldP=gm("GOLDBEES")?Math.min(gm("GOLDBEES")[3],.10)-rf:0;
+    const gm=x=>STOCKS[x]&&STOCKS[x].m&&(STOCKS[x].m["10"]||STOCKS[x].m["5"]),giltP=gm("LTGILTBEES")?gm("LTGILTBEES")[3]-rf:0,goldP=gm("GOLDBEES")?Math.min(gm("GOLDBEES")[3],.10)-rf:0;
     const rows=use.map((h,i)=>{
       const rd=A.rd[i],r=A.ret[i],capm=rf+beta[i]*(erm-rf);let FFr=null,APr=null;
       if(F){const y=[],X=[];rd.forEach((d,t)=>{const k=ffm.get(d);if(k!=null){y.push(r[t]-F.rf[k]);X.push([1,F.mkt[k],F.smb[k],F.hml[k]])}});
         if(y.length>=60){const o=ols(y,X);if(o)FFr={...o,e:rf+o.b[1]*(erm-rf)+o.b[2]*(P.smb||0)+o.b[3]*(P.hml||0)}}}
-      if(mkt&&ext.every(Boolean)){const y=[],X=[];for(let t=1;t<rd.length;t++){const d0=rd[t-1],d1=rd[t],ch=L=>levelOn(L,d1)/levelOn(L,d0)-1;
+      if(MOD("apt")&&mkt&&ext.every(Boolean)){const y=[],X=[];for(let t=1;t<rd.length;t++){const d0=rd[t-1],d1=rd[t],ch=L=>levelOn(L,d1)/levelOn(L,d0)-1;
           const row=[1,ch(mkt)-rf/TD,ch(ext[2]),ch(ext[3]),ch(ext[0]),ch(ext[1])];if(row.every(Number.isFinite)){y.push(r[t]-rf/TD);X.push(row)}}
         if(y.length>=60){const o=ols(y,X);if(o)APr={...o,e:rf+o.b[1]*(erm-rf)+o.b[2]*giltP+o.b[3]*goldP}}}
       return {sym:h.sym,beta:beta[i],capm,FF:FFr,AP:APr,past:P_ret(i)}});
@@ -864,7 +865,8 @@ async function modelsHTML(A,use,w,beta){
       ${rows.some(x=>x.AP)?`<details><summary>APT factor sensitivities</summary><div class="scroll"><table><thead><tr><th>Stock</th><th class="n">Market</th><th class="n">Bonds (gilt)</th><th class="n">Gold</th><th class="n">US dollar</th><th class="n">Crude oil</th><th class="n">Alpha a year</th></tr></thead><tbody>
         ${rows.filter(x=>x.AP).map(x=>`<tr><td><b>${esc(x.sym)}</b></td>${[1,2,3,4,5].map(k=>`<td class="n">${f2(x.AP.b[k])}</td>`).join("")}<td class="n ${cls(x.AP.b[0])}">${pct(x.AP.b[0]*TD,1)}</td></tr>`).join("")}</tbody></table></div></details>`:""}
       <p class="note"><b>CAPM:</b> risk-free ${pct(rf,1)} + β × (${pct(erm,1)} − ${pct(rf,1)}). <b>Fama-French 3-factor:</b> regression of the stock's daily excess return on the Indian market, size (SMB: small minus big) and value (HML: high minus low book-to-market) factors from the IIM Ahmedabad data library${ff?` (data to ${esc(fmtD(ff.to))}; long-run premia since ${esc(ff.since.slice(0,4))}: SMB ${pct(P.smb,1)}, HML ${pct(P.hml,1)} a year)`:""}; a positive SMB loading means it behaves like a small company, a positive HML loading like a value stock. <b>APT:</b> regression on five macro factors (market, government bonds, gold, US dollar, crude oil); expected return = risk-free + Σ sensitivity × premium, with premia from the market (${pct(erm-rf,1)}), bonds (${pct(giltP,1)}) and gold (${pct(goldP,1)}); the dollar and oil are treated as risks without a premium. R² = how much of the daily movement the factors explain. Estimates for learning, not forecasts.</p></section>`;
-  }catch(e){box.innerHTML=`<section style="margin-top:28px"><h2>Return models compared</h2><p class="note">Factor data is not available yet (it arrives with the next evening update).</p></section>`}
+    const tb=box.querySelector("table");if(tb){if(!MOD("ff"))hideCols(tb,h=>h.startsWith("FF")||h==="Fama-French");if(!MOD("apt")){hideCols(tb,h=>h.startsWith("APT"));box.querySelectorAll("details").forEach(d=>d.remove())}if(!MOD("capm"))hideCols(tb,h=>h.startsWith("CAPM"))}
+  }catch(e){console.warn("models",e);box.innerHTML=`<section style="margin-top:28px"><h2>Return models compared</h2><p class="note">Factor data is not available yet (it arrives with the next evening update).</p></section>`}
 }
 /* ---------- your portfolio in simple words (rule-based report) ---------- */
 function simpleHTML(A,P,use,w,beta,pb,psh,mS,val){
@@ -946,7 +948,7 @@ function attribHTML(use,w,P){
 }
 __V2__
 /* ---------- expected return (CAPM) ---------- */
-function ermDefault(){const m=STOCKS[NIFTY]&&STOCKS[NIFTY].m&&STOCKS[NIFTY].m["10"];return m&&Number.isFinite(m[3])?Math.round(m[3]*1000)/1000:0.12}
+function ermDefault(){if(SITE.models&&Number.isFinite(SITE.models.erm))return SITE.models.erm;const m=STOCKS[NIFTY]&&STOCKS[NIFTY].m&&STOCKS[NIFTY].m["10"];return m&&Number.isFinite(m[3])?Math.round(m[3]*1000)/1000:0.12}
 function expHTML(use,w,beta,P,mS,val){
   const rf=state.rf,erm=state.erm??ermDefault(),ok=beta.every(Number.isFinite);
   if(!ok)return `<section style="margin-top:28px"><h2>Expected return ${tip("capm")}</h2><p class="note">Needs ${BN()} data to calculate beta. It will appear after the next price update.</p></section>`;
@@ -977,7 +979,7 @@ function expHTML(use,w,beta,P,mS,val){
 function bindExp(){
   const e=$("#ermIn"),r=$("#rf2In");if(!e)return;
   e.onchange=()=>{const v=parseFloat(e.value);if(Number.isFinite(v)&&v>-50&&v<100){state.erm=v/100;save();renderPortfolio()}};
-  r.onchange=()=>{const v=parseFloat(r.value);if(Number.isFinite(v)&&v>=0&&v<30){state.rf=v/100;save();renderPortfolio()}};
+  r.onchange=()=>{const v=parseFloat(r.value);if(Number.isFinite(v)&&v>=0&&v<30){state.rf=v/100;state.rfUser=1;save();renderPortfolio()}};
 }
 /* ---------- optimiser ---------- */
 const dot=(a,b)=>a.reduce((s,x,i)=>s+x*b[i],0);
@@ -1001,7 +1003,7 @@ function frontier(mu,S,cap){
 }
 function optimise(A,P,use,w,beta){
   if(state.cap<1/use.length-1e-9)state.cap=[1,.5,.4,.3,.2].filter(c=>c>=1/use.length-1e-9).at(-1);
-  const erm=state.erm??ermDefault(),capmOK=beta.every(Number.isFinite),useCapm=state.optmu==="capm"&&capmOK;
+  const erm=state.erm??ermDefault(),capmOK=beta.every(Number.isFinite)&&MOD("capm"),useCapm=state.optmu==="capm"&&capmOK;
   const mu=useCapm?beta.map(b=>state.rf+b*(erm-state.rf)):P.S.map(s=>s.ar),S=P.C.map(r=>r.map(c=>c*TD)),n=use.length,cap=Math.max(state.cap,1/n),rf=state.rf;
   const F=frontier(mu,S,cap),minV=F[0],sh=p=>(p.r-rf)/p.k,best=F.reduce((a,p)=>sh(p)>sh(a)?p:a,F[0]);
   const pb=x=>x.reduce((s,v,i)=>s+v*beta[i],0),cur={w,r:useCapm?dot(w,mu):P.ret,k:P.risk};
@@ -1028,9 +1030,9 @@ function optimise(A,P,use,w,beta){
       const tip=best;return scatter(W,H,[...P.S.map((s,i)=>({x:s.ak,y:mu[i],label:use[i].sym,small:1})),{x:minV.k,y:minV.r,label:"Lowest risk",min:1},{x:best.k,y:best.r,label:"Highest Sharpe"},{x:cur.k,y:cur.r,label:"Your mix",main:1}],
         F.map(p=>({x:p.k,y:p.r})),[{x:0,y:rf},{x:tip.k*1.25,y:rf+(tip.r-rf)*1.25}]);
     });
-    $("#rfIn").onchange=()=>{const v=parseFloat($("#rfIn").value);if(Number.isFinite(v)&&v>=0&&v<30){state.rf=v/100;save();renderPortfolio()}};
-    $("#capIn").onchange=()=>{state.cap=+$("#capIn").value;save();renderPortfolio()};
-    $("#muIn").onchange=()=>{state.optmu=$("#muIn").value;save();renderPortfolio()};
+    $("#rfIn").onchange=()=>{const v=parseFloat($("#rfIn").value);if(Number.isFinite(v)&&v>=0&&v<30){state.rf=v/100;state.rfUser=1;save();renderPortfolio()}};
+    $("#capIn").onchange=()=>{state.cap=+$("#capIn").value;state.capUser=1;save();renderPortfolio()};
+    $("#muIn").onchange=()=>{state.optmu=$("#muIn").value;state.muUser=1;save();renderPortfolio()};
     const apply=x=>{state.mode="wt";use.forEach((h,i)=>{h.wt=Math.round(x.w[i]*1000)/10});save();document.getElementsByName("mode").forEach(r=>r.checked=r.value==="wt");renderPortfolio();toast("Weights applied. Switch back to 'By quantity' any time.")};
     $("#useMin").onclick=()=>apply(minV);$("#useBest").onclick=()=>apply(best);
   };
@@ -1199,7 +1201,7 @@ function viewScreen(){
   $("#suni").value=scrUni;$("#suni").addEventListener("input",()=>{scrUni=$("#suni").value;drawScreen()});
   $("#ssec").innerHTML=`<option value="">All sectors</option>`+secs.map(s=>`<option>${esc(s)}</option>`).join("");
   $("#ssort").value=scrSort;$("#srf").value=(state.rf*100).toFixed(2);
-  $("#srf").onchange=()=>{const v=parseFloat($("#srf").value);if(Number.isFinite(v)&&v>=0&&v<30){state.rf=v/100;save();drawScreen()}};
+  $("#srf").onchange=()=>{const v=parseFloat($("#srf").value);if(Number.isFinite(v)&&v>=0&&v<30){state.rf=v/100;state.rfUser=1;save();drawScreen()}};
   ["#sq","#ssec","#ssort","#sliq"].forEach(id=>$(id).addEventListener("input",drawScreen));
   $("#stab").addEventListener("click",ev=>{const b=ev.target.closest("[data-add]");if(!b)return;const s=b.dataset.add;
     if(!state.holdings.some(h=>h.sym===s)){state.holdings.push({sym:s,qty:10,buy:0,wt:10});save()}b.disabled=true;b.textContent="Added";toast(s+" added to your portfolio")});
@@ -1310,7 +1312,7 @@ function loadContent(){try{FB.F.onSnapshot(FB.F.doc(FB.db,"site","content"),d=>{
 let unBlk=null;
 function watchBlocked(u){if(unBlk){unBlk();unBlk=null}blocked=null;if(!u)return;try{unBlk=FB.F.onSnapshot(FB.F.doc(FB.db,"blocked",u.uid),d=>{const was=!!blocked;blocked=d.exists()?(d.data()||{}):null;if(was!==!!blocked){acct();route()}},()=>{})}catch(e){}}
 function loadSite(){try{FB.F.onSnapshot(FB.F.doc(FB.db,"site","config"),d=>{const c=d.exists()?d.data():{};const g=JSON.stringify(SITE.gated);
-  if(Array.isArray(c.gated))SITE.gated=c.gated;SITE.banner=c.banner||"";const v2o=JSON.stringify(SITE.v2||{});SITE.v2=c.v2||{};if(v2o!==JSON.stringify(SITE.v2)&&["portfolio","perf"].includes(curView()))route();siteBanner();if(g!==JSON.stringify(SITE.gated))route();else if(curView()==="home")$("#featBtns")&&($("#featBtns").innerHTML=featHTML())},()=>{})}catch(e){}}
+  if(Array.isArray(c.gated))SITE.gated=c.gated;SITE.banner=c.banner||"";const v2o=JSON.stringify([SITE.v2||{},SITE.models||{}]);SITE.v2=c.v2||{};SITE.models=c.models||{};const md=applyModelDefaults();if((md||v2o!==JSON.stringify([SITE.v2,SITE.models]))&&["portfolio","perf","screen"].includes(curView()))route();siteBanner();if(g!==JSON.stringify(SITE.gated))route();else if(curView()==="home")$("#featBtns")&&($("#featBtns").innerHTML=featHTML())},()=>{})}catch(e){}}
 async function touchProfile(u){try{const F=FB.F,ref=F.doc(FB.db,"users",u.uid),snap=await F.getDoc(ref);
   await F.setDoc(ref,{email:u.email||"",name:(u.displayName||"").slice(0,80),lastLogin:F.serverTimestamp(),...(snap.exists()?{}:{created:F.serverTimestamp()})},{merge:true})}catch(e){}}
 const subcol=n=>FB.F.collection(FB.db,"users",user.uid,n);

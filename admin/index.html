@@ -114,7 +114,7 @@ function draw(){if(tab!=="data")clearTimeout(ghTimer);({data:drawData,stocks:dra
 /* live Firestore listeners: everything updates by itself */
 function watch(){
   unsub.push(F.onSnapshot(F.collection(db,"users"),s=>{USERS=s.docs.map(d=>({id:d.id,...d.data()}));if(tab==="users")drawUsers()},e=>console.warn(e)));
-  unsub.push(F.onSnapshot(F.doc(db,"site","config"),d=>{const c=d.exists()?d.data():{};SITE={gated:Array.isArray(c.gated)?c.gated:["plan","portfolio","perf","screen","single","pair"],banner:c.banner||"",v2:c.v2||{},updated:tsd(c.updated),by:c.by||""};if(tab==="settings")drawSettings()}));
+  unsub.push(F.onSnapshot(F.doc(db,"site","config"),d=>{const c=d.exists()?d.data():{};SITE={gated:Array.isArray(c.gated)?c.gated:["plan","portfolio","perf","screen","single","pair"],banner:c.banner||"",v2:c.v2||{},models:c.models||{},updated:tsd(c.updated),by:c.by||""};if(tab==="settings")drawSettings()}));
   unsub.push(F.onSnapshot(F.doc(db,"site","content"),d=>{CONTENT=d.exists()?d.data():{};if(tab==="content")drawContent()},()=>{}));
   unsub.push(F.onSnapshot(F.query(F.collection(db,"activity"),F.orderBy("at","desc"),F.limit(300)),s=>{ACT=s.docs.map(d=>({id:d.id,...d.data()}));if(tab==="activity")drawActivity()},e=>console.warn("activity",e)));
   unsub.push(F.onSnapshot(F.doc(db,"site","stocks"),d=>{const c=d.exists()?d.data():{};STK={add:c.add||[],remove:c.remove||[],edit:c.edit||{},updated:tsd(c.updated),by:c.by||""};if(tab==="stocks")drawStocks()},()=>{}));
@@ -207,11 +207,22 @@ function drawSettings(){
   ${FEATS.map(([k,l])=>`<label class="chk"><input type="checkbox" value="${k}" ${SITE.gated.includes(k)?"checked":""}> ${l}</label>`).join("")}
   <h3>Advanced analysis sections (v2)</h3><p class="note">Untick to hide a section from every customer.</p>
   ${V2.map(([k,l,pg])=>`<label class="chk"><input type="checkbox" class="v2c" value="${k}" ${SITE.v2[k]===false?"":"checked"}> ${l} <span class="note">· ${pg} page</span></label>`).join("")}
+  <h3>Portfolio models</h3><p class="note">Turn each model on or off for all customers, and set the numbers they start with. A customer who changes a number on their own screen keeps their own value.</p>
+  ${[["markowitz","Markowitz optimiser and efficient frontier (lowest-risk and highest-Sharpe weights)"],["capm","CAPM: beta, expected return and the CAPM column"],["ff","Fama-French 3-factor model (IIM Ahmedabad data)"],["apt","APT: market, bonds, gold, US dollar and crude oil factors"]].map(([k,l])=>`<label class="chk"><input type="checkbox" class="mdc" value="${k}" ${SITE.models[k]===false?"":"checked"}> ${l}</label>`).join("")}
+  <div class="row" style="margin-top:8px;align-items:flex-end">
+    <label style="display:grid;gap:4px;font-size:14px">Risk-free rate % a year<input type="text" id="mRf" inputmode="decimal" style="width:9em" placeholder="6.5" value="${Number.isFinite(SITE.models.rf)?(SITE.models.rf*100).toFixed(2):""}"></label>
+    <label style="display:grid;gap:4px;font-size:14px">Expected market return % a year<input type="text" id="mErm" inputmode="decimal" style="width:9em" placeholder="auto: Nifty 10-yr CAGR" value="${Number.isFinite(SITE.models.erm)?(SITE.models.erm*100).toFixed(2):""}"></label>
+    <label style="display:grid;gap:4px;font-size:14px">Most in one stock (optimiser)<select id="mCap"><option value="">Default (40%)</option>${[1,.5,.4,.3,.2].map(c=>`<option value="${c}" ${SITE.models.cap===c?"selected":""}>${c===1?"No limit":Math.round(c*100)+"%"}</option>`).join("")}</select></label>
+    <label style="display:grid;gap:4px;font-size:14px">Expected return used by the optimiser<select id="mMu"><option value="">Default (CAPM)</option><option value="capm" ${SITE.models.mu==="capm"?"selected":""}>CAPM (beta-based)</option><option value="past" ${SITE.models.mu==="past"?"selected":""}>Past return</option></select></label>
+  </div><p class="note">Leave a box empty to use the default. Risk-free rate: the 91-day T-bill or 10-year G-sec yield is a common choice.</p>
   <h3>Notice banner</h3><p class="note">Shown at the top of every customer page. Leave empty to hide it.</p>
   <textarea id="ban" maxlength="300" placeholder="Example: Prices update after 8:30 pm IST today.">${esc(SITE.banner)}</textarea>
   <div class="row" style="margin-top:12px"><button class="btn" id="sv">Save settings</button><span class="note">${SITE.updated?`Last saved ${ago(SITE.updated)} by ${esc(SITE.by)}`:"Using default settings"}</span></div>`;
-  $("#sv").onclick=async()=>{const g=[...el.querySelectorAll(".chk input:not(.v2c):checked")].map(x=>x.value),v2=Object.fromEntries(V2.map(([k])=>[k,el.querySelector(`.v2c[value="${k}"]`).checked]));
-    try{await F.setDoc(F.doc(db,"site","config"),{gated:g,v2,banner:$("#ban").value.trim().slice(0,300),updated:F.serverTimestamp(),by:user.email});toast("Saved. The customer site is updated.")}catch(e){toast("Not saved: "+e.code)}};
+  $("#sv").onclick=async()=>{const g=[...el.querySelectorAll(".chk input:not(.v2c):not(.mdc):checked")].map(x=>x.value),v2=Object.fromEntries(V2.map(([k])=>[k,el.querySelector(`.v2c[value="${k}"]`).checked]));
+    const pn=id=>{const v=parseFloat($("#"+id).value);return Number.isFinite(v)?v/100:null},rf=pn("mRf"),erm=pn("mErm");
+    if(rf!=null&&(rf<0||rf>.3)||erm!=null&&(erm<-.5||erm>1)){toast("Check the rates: risk-free 0–30%, market return −50–100%");return}
+    const models={...Object.fromEntries([...el.querySelectorAll(".mdc")].map(x=>[x.value,x.checked])),...(rf!=null?{rf}:{}),...(erm!=null?{erm}:{}),...($("#mCap").value?{cap:+$("#mCap").value}:{}),...($("#mMu").value?{mu:$("#mMu").value}:{})};
+    try{await F.setDoc(F.doc(db,"site","config"),{gated:g,v2,models,banner:$("#ban").value.trim().slice(0,300),updated:F.serverTimestamp(),by:user.email});toast("Saved. The customer site is updated.")}catch(e){toast("Not saved: "+e.code)}};
 }
 
 /* ---------- admins ---------- */

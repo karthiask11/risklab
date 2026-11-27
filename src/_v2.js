@@ -1,3 +1,11 @@
+/* ---------- model controls from the admin site (site/config.models) ---------- */
+const MOD=k=>!(SITE.models&&SITE.models[k]===false);
+function hideCols(tbl,test){const hs=[...tbl.tHead.rows[0].cells],n=hs.length,idx=hs.map((h,i)=>test(h.textContent.trim())?i:-1).filter(i=>i>=0).sort((a,b)=>b-a);[...tbl.rows].forEach(r=>{if(r.cells.length===n)idx.forEach(i=>r.cells[i].remove())})}
+function applyModelDefaults(){const m=SITE.models||{};let ch=false;
+  if(Number.isFinite(m.rf)&&!state.rfUser&&state.rf!==m.rf){state.rf=m.rf;ch=true}
+  if(Number.isFinite(m.cap)&&!state.capUser&&state.cap!==m.cap){state.cap=m.cap;ch=true}
+  if(m.mu&&!state.muUser&&state.optmu!==m.mu){state.optmu=m.mu;ch=true}
+  return ch}
 /* ================= v2: deeper analysis (from NISM XXI-B, CFA, Palomar, Farrell, J.P. Morgan tools) =================
    Each block can be switched off by the admin (site/config.v2.<key> = false). */
 const V2ON=k=>!(SITE.v2&&SITE.v2[k]===false);
