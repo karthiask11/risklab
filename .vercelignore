@@ -1,7 +1,9 @@
-# Customer site on Vercel. The admin site is a separate Vercel project (Root Directory = admin).
-admin
+# Customer site on Vercel (Root Directory empty). The admin site is its own Vercel project with Root Directory = admin.
+# /admin on the customer site is redirected to the home page by vercel.json.
 .github
 *.py
 __pycache__
 firestore.rules
 README.md
+src
+build.py
