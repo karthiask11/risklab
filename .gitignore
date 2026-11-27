@@ -1,4 +1,4 @@
 __pycache__/
 *.pyc
 out/
-test_dbg.html
+site/test_dbg.html

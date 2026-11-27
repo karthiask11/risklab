@@ -6,7 +6,7 @@ on:
   workflow_dispatch:           # "Run workflow" button
   push:
     branches: [main]
-    paths-ignore: ["data/**"]
+    paths-ignore: ["site/data/**"]
 
 permissions:
   contents: write
@@ -34,13 +34,16 @@ jobs:
         run: |
           git config user.name "price-bot"
           git config user.email "price-bot@users.noreply.github.com"
-          git add data
+          git add site/data
           git commit -m "Prices $(date -u +%F)" || echo "No changes"
           for i in 1 2 3; do git pull --rebase --autostash origin main && git push && break; sleep 10; done
+      - name: GitHub Pages copy (customer site, plus the admin site at /admin/ as a backup address)
+        run: |
+          rm -rf _pages && cp -r site _pages && cp -r admin _pages/admin
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: .
+          path: _pages
 
   deploy:
     needs: update

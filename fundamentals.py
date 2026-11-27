@@ -1,7 +1,7 @@
 """Company fundamentals (P/E, P/B, ROE, debt to equity, market cap, profit margin) from Yahoo Finance only.
 
 Runs after update.py. Each run refreshes the oldest entries (Nifty 500 first), so the whole list
-is renewed about once a week without slowing the daily update. Writes data/fund.json:
+is renewed about once a week without slowing the daily update. Writes site/data/fund.json:
 {"updated": time, "f": {symbol: [pe, pb, roe, debt_to_equity, market_cap_crore, profit_margin, eps, date, sector_pe]}}
 """
 import datetime as dt
@@ -11,7 +11,7 @@ import time
 
 import yfinance as yf
 
-OUT = "data"
+OUT = "site/data"
 PER_RUN = int(os.environ.get("FUND_PER_RUN", "300"))
 
 

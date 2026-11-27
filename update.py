@@ -1,11 +1,11 @@
 """Daily price updater for Portfolio Risk Lab (Yahoo Finance only; no NSE servers).
 
 Runs on GitHub Actions every weekday evening:
-  1. stock list = data/universe.json (the saved list) + changes made in the admin site (Firestore site/stocks:
+  1. stock list = site/data/universe.json (the saved list) + changes made in the admin site (Firestore site/stocks:
      add, remove, edit name / sector / Nifty 500 flag) + optional stocks.txt lines "SYMBOL,Company name"
   2. downloads up to 10 years of daily closing prices from Yahoo Finance (split/bonus adjusted, dividends kept)
-  3. writes data/stocks.json, data/list.json, data/u/*.json, data/<SYMBOL>.json, data/meta.json
-  4. writes data/changes.json: what changed for each company (new, removed, renamed, splits/bonus, dividends,
+  3. writes site/data/stocks.json, site/data/list.json, site/data/u/*.json, site/data/<SYMBOL>.json, site/data/meta.json
+  4. writes site/data/changes.json: what changed for each company (new, removed, renamed, splits/bonus, dividends,
      failed downloads) so the admin site can show it
 """
 import datetime as dt
@@ -20,7 +20,7 @@ import pandas as pd
 import requests
 import yfinance as yf
 
-OUT = "data"
+OUT = "site/data"
 PERIOD = "10y"
 BATCH = 40
 # REITs and InvITs trade in series RR and IV. Used if NSE's list can't be read.
@@ -177,7 +177,7 @@ def admin_changes():
 
 
 def universe():
-    """Return [(symbol, name, industry)] and fill KIND / N500. Source: data/universe.json, else stocks.json."""
+    """Return [(symbol, name, industry)] and fill KIND / N500. Source: site/data/universe.json, else stocks.json."""
     path = os.path.join(OUT, "universe.json")
     rows = []
     if os.path.exists(path):
@@ -588,7 +588,7 @@ def main():
 
 
 def write_changes(old, saved, failed, events):
-    """Append today's company changes to data/changes.json (last 90 runs) for the admin site."""
+    """Append today's company changes to site/data/changes.json (last 90 runs) for the admin site."""
     new = {x["sym"]: x for x in saved}
     added = [{"sym": s, "name": new[s]["name"]} for s in new if s not in old]
     removed = [{"sym": s, "name": old[s]["name"]} for s in old if s not in new and not s.startswith("^")]
@@ -623,7 +623,7 @@ FF_URL = "https://faculty.iima.ac.in/iffm/Indian-Fama-French-Momentum/DATA/{m}_F
 
 def fama_french():
     """Indian Fama-French and momentum factors (IIM Ahmedabad data library, daily, survivorship-bias adjusted).
-    Saves data/_FF.json from 2016 and returns long-run yearly premia (since 1993) for the meta file."""
+    Saves site/data/_FF.json from 2016 and returns long-run yearly premia (since 1993) for the meta file."""
     today = dt.date.today()
     for back in range(0, 20):
         y, m = today.year, today.month - back

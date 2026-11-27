@@ -38,7 +38,7 @@ def main():
         print(f"Market closed at {now:%a %H:%M} IST; nothing to do")
         return
     today = now.date()
-    with open("data/stocks.json", encoding="utf-8") as f:
+    with open("site/data/stocks.json", encoding="utf-8") as f:
         syms = [x["sym"] for x in json.load(f)["stocks"]]
     tickers = [s + ".NS" for s in syms] + ["^NSEI"]
     names = dict(zip(tickers, syms + ["^NSEI"]))
