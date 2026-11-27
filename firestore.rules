@@ -8,11 +8,18 @@ service cloud.firestore {
         (request.auth.token.email == 'stockanalysistamil@gmail.com' && request.auth.token.email_verified == true)
         || exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
     }
+    function blockedUser() { return exists(/databases/$(database)/documents/blocked/$(request.auth.uid)); }
+    function writer(uid) { return owner(uid) && !blockedUser(); }
     function okName(d) { return d.name is string && d.name.size() > 0 && d.name.size() <= 80; }
 
     // Site settings: everyone reads (banner, which features need sign-in); only admins change them.
     match /site/{doc} {
       allow read: if true;
+      allow write: if isAdmin();
+    }
+    // Blocked accounts: the admin blocks; the user may read their own entry (to see the message).
+    match /blocked/{uid} {
+      allow read: if isAdmin() || owner(uid);
       allow write: if isAdmin();
     }
     // Admin list.
@@ -23,16 +30,16 @@ service cloud.firestore {
     // A user's profile and saved work: the user, and admins may read.
     match /users/{uid} {
       allow read: if owner(uid) || isAdmin();
-      allow delete: if owner(uid);
-      allow create, update: if owner(uid)
+      allow delete: if owner(uid) || isAdmin();
+      allow create, update: if writer(uid)
         && request.resource.data.keys().hasOnly(['email', 'name', 'created', 'lastLogin'])
         && request.resource.data.email is string && request.resource.data.email.size() <= 200
         && request.resource.data.name is string && request.resource.data.name.size() <= 80;
 
       match /portfolios/{pid} {
         allow read: if owner(uid) || isAdmin();
-        allow delete: if owner(uid);
-        allow create, update: if owner(uid)
+        allow delete: if owner(uid) || isAdmin();
+        allow create, update: if writer(uid)
           && request.resource.data.keys().hasOnly(['name', 'holdings', 'mode', 'period', 'tx', 'ips', 'created', 'updated'])
           && okName(request.resource.data)
           && request.resource.data.holdings is list
@@ -42,15 +49,15 @@ service cloud.firestore {
       }
       match /plans/{id} {
         allow read: if owner(uid) || isAdmin();
-        allow delete: if owner(uid);
-        allow create, update: if owner(uid)
+        allow delete: if owner(uid) || isAdmin();
+        allow create, update: if writer(uid)
           && request.resource.data.keys().hasOnly(['name', 'ips', 'created', 'updated'])
           && okName(request.resource.data) && request.resource.data.ips is map;
       }
       match /reports/{id} {
         allow read: if owner(uid) || isAdmin();
-        allow delete: if owner(uid);
-        allow create: if owner(uid)
+        allow delete: if owner(uid) || isAdmin();
+        allow create: if writer(uid)
           && request.resource.data.keys().hasOnly(['name', 'kind', 'data', 'created'])
           && okName(request.resource.data)
           && request.resource.data.kind in ['portfolio', 'perf']
